@@ -15,8 +15,8 @@ scheduled jobs / agents and gives you a native way to receive them:
 
 | Target | Contents | Builds on |
 |--------|----------|-----------|
-| `KeryxKit` | Platform-independent core: `InboxState` (unseen/badge state machine), `DirectoryScanner`, `InboxWatcher` + `PollingInboxWatcher`, `InboxController` | Linux + macOS, fully unit-tested (Swift Testing) |
-| `KeryxApp` | Thin AppKit menubar shell (`NSStatusItem`), guarded with `#if os(macOS)` | macOS only (no-op placeholder binary on Linux) |
+| `KeryxKit` | Platform-independent core: `InboxState` (unseen/badge state machine), `DirectoryScanner`, `InboxWatcher` (polling + event-driven vnode on macOS), `AppSettings` + stores, `InboxController` | Linux + macOS, fully unit-tested (Swift Testing) |
+| `KeryxApp` | Thin AppKit menubar shell (`NSStatusItem`, settings window, user notifications), guarded with `#if os(macOS)` | macOS only (no-op placeholder binary on Linux) |
 
 The development loop is entirely on Linux: every behavior is TDD'd in
 `KeryxKit`, which knows nothing about AppKit. The macOS shell is a thin
@@ -43,6 +43,13 @@ swift test    # 15+ tests over the core
 ```
 
 ### macOS (runtime)
+
+**Settings:** ⌘, from the menubar menu (or "Settings…") — pick the inbox
+directory and the fallback scan interval. Changes apply live.
+
+**Notifications:** the app requests notification permission on first launch
+and posts a notification when new (or newly updated) files land in the inbox.
+Watching is push-based on macOS (vnode events) — no polling delay.
 
 **Option 1 — prebuilt app:** download `Keryx-vX.Y.Z-macos.zip` from
 [Releases](https://github.com/mattfinlayson/keryx/releases), unzip, and run

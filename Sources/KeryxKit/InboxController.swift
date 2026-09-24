@@ -74,10 +74,9 @@ public final class InboxController {
             if wasRunning {
                 start()
             }
-        } else if intervalChanged, isRunning {
+        } else if intervalChanged, isRunning, let url = inboxURL {
             // Polling watchers need recreation to pick up the new interval;
             // event-driven watchers ignore it entirely.
-            let url = self.url ?? scanner.directory
             stop()
             watcher = watcherFactory(url, scanInterval)
             start()
@@ -85,10 +84,6 @@ public final class InboxController {
 
         try? refresh()
     }
-
-    private var url: URL? { inboxURL ?? settingsFallbackURL }
-
-    private var settingsFallbackURL: URL? { nil }
 
     /// Starts watching; the inbox is scanned immediately.
     public func start() {

@@ -4,35 +4,68 @@ import KeryxKit
 
 // MARK: - Configuration
 
-let inboxURL: URL = {
-    if let custom = ProcessInfo.processInfo.environment["KERYX_INBOX"], !custom.isEmpty {
-        return URL(fileURLWithPath: (custom as NSString).expandingTildeInPath)
+let envInboxOverride: URL? = ProcessInfo.processInfo.environment["KERYX_INBOX"]
+    .flatMap { value in
+        let expanded = (value as NSString).expandingTildeInPath
+        return URL(fileURLWithPath: expanded, isDirectory: true)
     }
-    return FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("keryx-inbox", isDirectory: true)
-}()
 
 let viewerAppName: String? = ProcessInfo.processInfo.environment["KERYX_OPEN_APP"]
+
+let defaultInbox = FileManager.default.homeDirectoryForCurrentUser
+    .appendingPathComponent("keryx-inbox", isDirectory: true)
+
+/// The inbox the app should use given stored settings (env var wins).
+func effectiveInboxURL(for settings: AppSettings) -> URL {
+    envInboxOverride ?? settings.inboxURL ?? defaultInbox
+}
 
 // MARK: - AppDelegate
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    let controller = InboxController(
-        scanner: DirectoryScanner(directory: inboxURL),
-        watcher: PollingInboxWatcher(directory: inboxURL, interval: 2.0)
-    )
+    let store = UserDefaultsSettingsStore()
+    let notifier = UserNotifier()
+    let controller: InboxController
+    lazy var settingsWindow = SettingsWindowController(store: store)
     var statusItem: NSStatusItem!
 
+    init() {
+        let settings = store.settings
+        let inbox = effectiveInboxURL(for: settings)
+        controller = InboxController(
+            scanner: DirectoryScanner(directory: inbox),
+            watcherFactory: InboxWatchers.platformDefault
+        )
+        super.init()
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
-        try? FileManager.default.createDirectory(at: inboxURL, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(
+            at: effectiveInboxURL(for: store.settings), withIntermediateDirectories: true)
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.title = "✉"
 
+        notifier.activate()
+        controller.onNewFiles = { [notifier] files in
+            notifier.notifyNewFiles(files)
+        }
         controller.onChange = { [weak self] in
             DispatchQueue.main.async { [weak self] in self?.render() }
         }
+        settingsWindow.onApply = { [weak self] settings in
+            self?.apply(settings)
+        }
+
+        controller.apply(settings: store.settings)
         controller.start()
+        render()
+    }
+
+    func apply(_ settings: AppSettings) {
+        let inbox = effectiveInboxURL(for: settings)
+        try? FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
+        controller.apply(settings: AppSettings(inboxURL: inbox, scanInterval: settings.scanInterval))
         render()
     }
 
@@ -58,6 +91,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         menu.addItem(.separator())
+        let settingsItem = NSMenuItem(
+            title: "Settings…", action: #selector(showSettings(_:)), keyEquivalent: ","
+        )
+        settingsItem.target = self
+        menu.addItem(settingsItem)
         menu.addItem(NSMenuItem(title: "Open Inbox Folder", action: #selector(openInboxFolder), keyEquivalent: "o"))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit Keryx", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
@@ -78,8 +116,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         render()
     }
 
+    @objc func showSettings(_ sender: Any) {
+        settingsWindow.show()
+    }
+
     @objc func openInboxFolder() {
-        NSWorkspace.shared.open(inboxURL)
+        NSWorkspace.shared.open(effectiveInboxURL(for: store.settings))
     }
 }
 
