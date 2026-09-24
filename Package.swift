@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "keryx",
+    platforms: [.macOS(.v15)],
     targets: [
         // Platform-independent core: inbox state machine, directory scan,
         // file-watching. Fully unit-tested on Linux (Swift Testing).
