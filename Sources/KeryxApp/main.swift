@@ -104,6 +104,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         settingsItem.target = self
         menu.addItem(settingsItem)
+        if LaunchAtLogin.isAvailable {
+            let launchItem = NSMenuItem(
+                title: "Launch at Login",
+                action: #selector(toggleLaunchAtLogin(_:)),
+                keyEquivalent: ""
+            )
+            launchItem.target = self
+            launchItem.state = LaunchAtLogin.isEnabled ? .on : .off
+            menu.addItem(launchItem)
+        }
         menu.addItem(NSMenuItem(title: "Open Inbox Folder", action: #selector(openInboxFolder), keyEquivalent: "o"))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit Keryx", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
@@ -128,6 +138,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func markAllRead(_ sender: Any) {
         controller.markAllAsRead()
+        render()
+    }
+
+    @objc func toggleLaunchAtLogin(_ sender: Any) {
+        do {
+            if LaunchAtLogin.isEnabled {
+                try LaunchAtLogin.disable()
+            } else {
+                try LaunchAtLogin.enable()
+            }
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = "Could not update Launch at Login"
+            alert.informativeText = """
+            \(error.localizedDescription)
+
+            If the app was quarantined after download, run `xattr -cr Keryx.app`,
+            or approve it manually in System Settings → General → Login Items.
+            """
+            alert.runModal()
+        }
         render()
     }
 

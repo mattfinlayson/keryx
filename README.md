@@ -58,6 +58,10 @@ swift test    # 15+ tests over the core
 
 **Mark All Read** (⇧⌘K in the menu) clears every unseen flag at once.
 
+**Launch at Login:** toggle in the menubar menu. Registered via the system
+(SMAppService); approve in System Settings → General → Login Items if macOS
+asks. Requires the bundled app (not the bare `swift build` binary).
+
 **Notifications:** the app requests notification permission on first launch
 and posts a notification when new (or newly updated) files land in the inbox.
 Watching is push-based on macOS (vnode events) — no polling delay.
