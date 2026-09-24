@@ -66,7 +66,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func apply(_ settings: AppSettings) {
         let inbox = effectiveInboxURL(for: settings)
         try? FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
-        controller.apply(settings: AppSettings(inboxURL: inbox, scanInterval: settings.scanInterval))
+        controller.apply(settings: AppSettings(inboxURL: inbox, maxFileAge: settings.maxFileAge, openers: settings.openers))
         render()
     }
 
