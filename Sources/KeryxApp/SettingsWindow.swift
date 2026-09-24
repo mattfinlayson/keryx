@@ -84,7 +84,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
         // Opener rules row
         let openersTitle = NSTextField(labelWithString: "Open files ending in:")
-        extensionField.placeholderString = "e.g. md"
+        extensionField.placeholderString = "e.g. md or *.md"
         extensionField.target = self
         extensionField.action = #selector(openersEdited(_:))
         openerAppLabel.lineBreakMode = .byTruncatingMiddle
@@ -144,7 +144,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         removeRuleButton.isEnabled = !settings.openers.isEmpty
         let summary = settings.openers
             .sorted { $0.key < $1.key }
-            .map { ".\($0.key) → \($0.value)" }
+            .map { key, app in
+                key == "*" ? "* (all files) → \(app)" : ".\(key) → \(app)"
+            }
             .joined(separator: "   ")
         openersSummary.stringValue = summary.isEmpty ? "No overrides — all files open with the OS default app." : summary
         // Prefill the extension field with the first rule when empty.

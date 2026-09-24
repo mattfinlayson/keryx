@@ -124,7 +124,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let entry = sender.representedObject as? FileEntry else { return }
         controller.open(entry)
         let ext = entry.url.pathExtension.lowercased()
-        let opener = store.settings.openers[ext] ?? viewerAppName
+        let opener = store.settings.opener(forExtension: ext, in: viewerAppName.map { ["*": $0] } ?? [:])
         if let appName = opener {
             let open = Process()
             open.executableURL = URL(fileURLWithPath: "/usr/bin/open")
