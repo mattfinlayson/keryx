@@ -45,6 +45,32 @@ struct InboxStateTests {
         #expect(state.unseenPaths.contains("/tmp/inbox/report.md"))
     }
 
+    @Test("markAllOpened clears every unseen flag")
+    mutating func markAllOpened() {
+        var state = InboxState()
+        state.insert(entry("a.md", modified: Date(timeIntervalSince1970: 100)))
+        state.insert(entry("b.md", modified: Date(timeIntervalSince1970: 200)))
+        state.insert(entry("c.md", modified: Date(timeIntervalSince1970: 300)))
+
+        let changed = state.markAllOpened()
+
+        #expect(changed)
+        #expect(state.badgeCount == 0)
+        #expect(state.unseenPaths.isEmpty)
+        #expect(state.entries.count == 3)
+    }
+
+    @Test("markAllOpened on an already-clear inbox is a no-op")
+    mutating func markAllOpenedNoOp() {
+        var state = InboxState()
+        state.insert(entry("a.md", modified: Date(timeIntervalSince1970: 100)))
+        state.markAllOpened()
+
+        let changed = state.markAllOpened()
+
+        #expect(!changed)
+    }
+
     @Test("markOpened clears the unseen flag and the badge")
     mutating func openClearsUnseen() {
         var state = InboxState()

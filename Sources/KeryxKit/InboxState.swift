@@ -29,6 +29,14 @@ public struct InboxState: Sendable {
         return true
     }
 
+    /// Marks every file as seen (opened). Returns true if the state changed.
+    @discardableResult
+    public mutating func markAllOpened() -> Bool {
+        guard !unseenPaths.isEmpty else { return false }
+        unseenPaths.removeAll()
+        return true
+    }
+
     /// Marks a file as seen (opened). Returns true if the state changed.
     @discardableResult
     public mutating func markOpened(path: String) -> Bool {

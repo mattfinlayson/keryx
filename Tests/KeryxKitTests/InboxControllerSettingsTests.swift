@@ -68,6 +68,27 @@ struct InboxControllerSettingsTests {
         #expect(notified == ["job-1.md", "job-1.md"])
     }
 
+    @Test("markAllAsRead clears the badge without firing onNewFiles")
+    func markAllAsRead() throws {
+        var notified: [String] = []
+        controller.onNewFiles = { notified.append(contentsOf: $0.map(\.name)) }
+        var changeCount = 0
+        controller.onChange = { changeCount += 1 }
+
+        try touch("job-1.md")
+        try touch("job-2.md")
+        try controller.refresh()
+        notified.removeAll()
+        let changesBefore = changeCount
+
+        controller.markAllAsRead()
+
+        #expect(controller.state.badgeCount == 0)
+        #expect(controller.state.entries.count == 2)
+        #expect(changeCount > changesBefore)
+        #expect(notified.isEmpty)
+    }
+
     @Test("opened files do not re-notify on later refreshes")
     func noNotifyAfterOpen() throws {
         var notified: [String] = []

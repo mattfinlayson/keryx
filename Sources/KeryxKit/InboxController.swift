@@ -144,6 +144,13 @@ public final class InboxController {
             onChange?()
         }
     }
+    /// Marks every entry as seen; drives the "Mark All Read" action.
+    public func markAllAsRead() {
+        let changed: Bool = queue.sync { _state.markAllOpened() }
+        if changed {
+            onChange?()
+        }
+    }
 }
 
 extension InboxController: InboxWatcherDelegate {
