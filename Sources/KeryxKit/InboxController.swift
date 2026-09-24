@@ -37,19 +37,23 @@ public final class InboxController {
     private var maxFileAge: TimeInterval?
     private var isRunning = false
     private let watcherFactory: (URL) -> any InboxWatcher
+    private let seenStore: (any SeenStore)?
     private let queue = DispatchQueue(label: "keryx.inbox.controller", qos: .utility)
     private var _state = InboxState()
 
     public init(
         scanner: DirectoryScanner,
         watcher: (any InboxWatcher)? = nil,
-        watcherFactory: @escaping (URL) -> any InboxWatcher = InboxWatchers.platformDefault
+        watcherFactory: @escaping (URL) -> any InboxWatcher = InboxWatchers.platformDefault,
+        seenStore: (any SeenStore)? = nil
     ) {
         self.scanner = scanner
         self.watcher = watcher
         self.inboxURL = scanner.directory
         self.maxFileAge = scanner.maxFileAge
         self.watcherFactory = watcherFactory
+        self.seenStore = seenStore
+        self._state = InboxState(seenPaths: seenStore?.seenPaths ?? [])
     }
 
     /// Reconfigures the controller: swaps the watched inbox, age filter,
@@ -105,11 +109,17 @@ public final class InboxController {
     public func refresh() throws {
         var changed = false
         var updated = InboxState()
+        var previousUnseen: Set<String> = []
+        var previousSeen: Set<String> = []
+        var unseenChanged = false
+        var seenChanged = false
         var newFiles: [FileEntry] = []
         let files = try scanner.scan()
 
         queue.sync {
             updated = _state
+            previousUnseen = updated.unseenPaths
+            previousSeen = updated.seenPaths
             for file in files {
                 let previous = updated.entries.first { $0.id == file.id }
                 changed = updated.insert(file) || changed
@@ -121,11 +131,16 @@ public final class InboxController {
                 }
             }
             changed = updated.sync(existingPaths: files.map(\.id)) || changed
-            if changed {
+            unseenChanged = updated.unseenPaths != previousUnseen
+            seenChanged = updated.seenPaths != previousSeen
+            if changed || unseenChanged || seenChanged {
                 _state = updated
             }
         }
 
+        if changed || unseenChanged || seenChanged {
+            seenStore?.save(updated.seenPaths)
+        }
         if changed {
             onChange?()
         }
@@ -143,6 +158,7 @@ public final class InboxController {
             return false
         }
         if changed {
+            seenStore?.save(queue.sync { _state.seenPaths })
             onChange?()
         }
     }
@@ -150,6 +166,7 @@ public final class InboxController {
     public func markAllAsRead() {
         let changed: Bool = queue.sync { _state.markAllOpened() }
         if changed {
+            seenStore?.save(queue.sync { _state.seenPaths })
             onChange?()
         }
     }
