@@ -17,10 +17,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 440, height: 150),
             styleMask: [.titled, .closable],
-            title: "Keryx Settings",
             backing: .buffered,
             defer: false
         )
+        window.title = "Keryx Settings"
         window.center()
         super.init(window: window)
         window.delegate = self

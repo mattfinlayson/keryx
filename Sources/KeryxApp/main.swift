@@ -22,6 +22,7 @@ func effectiveInboxURL(for settings: AppSettings) -> URL {
 
 // MARK: - AppDelegate
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let store = UserDefaultsSettingsStore()
     let notifier = UserNotifier()
@@ -29,7 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     lazy var settingsWindow = SettingsWindowController(store: store)
     var statusItem: NSStatusItem!
 
-    init() {
+    override init() {
         let settings = store.settings
         let inbox = effectiveInboxURL(for: settings)
         controller = InboxController(
