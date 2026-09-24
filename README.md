@@ -73,6 +73,9 @@ and posts a notification when new (or newly updated) files land in the inbox.
 as the menu) and marks it read. Watching is push-based on macOS (vnode
 events) — no polling delay.
 
+**Read state persists across launches** — files you've opened stay read when
+the app restarts; only genuinely new (or rewritten) files re-flag unread.
+
 **About:** "About Keryx" in the menu shows the app version.
 
 **Option 1 — prebuilt app:** download `Keryx-vX.Y.Z-macos.zip` from
