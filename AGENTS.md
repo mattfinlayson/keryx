@@ -74,6 +74,11 @@ Key invariants:
 - Releases are tag-driven: `git tag vX.Y.Z && git push origin vX.Y.Z` triggers
   `.github/workflows/release.yml` (builds, generates the app icon, packages
   `Keryx.app`, creates a GitHub Release with generated notes).
+- **End every work stream that ships a release with the user's full
+  download/removal commands** — `curl -L` of the release zip, `unzip`,
+  `xattr -cr` (Gatekeeper workaround), and `open` — pinned to the version
+  just shipped, plus the `releases/latest/download/` variant when the asset
+  name is current. The user installs from these commands directly.
 - Settings persist in `UserDefaults` under the `keryx` domain. `KERYX_INBOX`
   and `KERYX_OPEN_APP` env vars override settings at runtime.
 
