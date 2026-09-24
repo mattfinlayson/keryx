@@ -62,9 +62,18 @@ swift test    # 15+ tests over the core
 (SMAppService); approve in System Settings → General → Login Items if macOS
 asks. Requires the bundled app (not the bare `swift build` binary).
 
+**Menubar:** a template-image tray icon that tints with light/dark menu bars
+and swaps to a full-tray glyph with an unread count when files arrive. The
+menu shows a latest-file preview (name + relative time), per-file unseen
+markers, and SF Symbol icons on actions.
+
 **Notifications:** the app requests notification permission on first launch
 and posts a notification when new (or newly updated) files land in the inbox.
-Watching is push-based on macOS (vnode events) — no polling delay.
+**Clicking a notification opens the newest file** (via the same opener rules
+as the menu) and marks it read. Watching is push-based on macOS (vnode
+events) — no polling delay.
+
+**About:** "About Keryx" in the menu shows the app version.
 
 **Option 1 — prebuilt app:** download `Keryx-vX.Y.Z-macos.zip` from
 [Releases](https://github.com/mattfinlayson/keryx/releases), unzip, and run
