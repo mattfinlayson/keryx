@@ -20,7 +20,8 @@ public final class VnodeInboxWatcher: InboxWatcher {
 
     public func start() {
         stop()
-        guard let fd = open(directory.path, O_EVTONLY) else { return }
+        let fd = open(directory.path, O_EVTONLY)
+        guard fd != -1 else { return }
         fileDescriptor = fd
         let source = DispatchSource.makeFileSystemObjectSource(
             fileDescriptor: fd,
