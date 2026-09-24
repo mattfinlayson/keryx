@@ -3,6 +3,18 @@ import AppKit
 import UniformTypeIdentifiers
 import KeryxKit
 
+/// Trashcan button for an opener-rule row; carries the rule's key.
+@MainActor
+private final class RuleTrashButton: NSButton {
+    var ruleKey: String = ""
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { nil }
+}
+
 /// Settings window: pick the inbox directory, hide files older than a
 /// cutoff, map file extensions to specific applications, and toggle
 /// launch-at-login. Changes apply live (no OK/Cancel), matching macOS
@@ -155,13 +167,12 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         for (key, app) in rules {
             let display = key == "*" ? "* (all files) → \(app)" : ".\(key) → \(app)"
             let label = NSTextField(labelWithString: display)
-            let trash = NSButton(image: NSImage(systemSymbolName: "trash", accessibilityDescription: "Remove rule")!,
-                                 target: self,
-                                 action: #selector(removeRule(_:)))
-            trash.bezelStyle = .textRounded
+            let trash = RuleTrashButton(image: NSImage(systemSymbolName: "trash", accessibilityDescription: "Remove rule")!,
+                                        target: self,
+                                        action: #selector(removeRule(_:)))
             trash.isBordered = false
             trash.contentTintColor = .secondaryLabelColor
-            trash.representedObject = key
+            trash.ruleKey = key
             let ruleRow = row(views: [label, trash])
             rulesStack.addArrangedSubview(ruleRow)
         }
@@ -237,8 +248,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    @objc private func removeRule(_ sender: NSButton) {
-        guard let key = sender.representedObject as? String else { return }
+    @objc private func removeRule(_ sender: RuleTrashButton) {
+        let key = sender.ruleKey
         var settings = store.settings
         var openers = settings.openers
         openers.removeValue(forKey: key)
