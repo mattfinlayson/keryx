@@ -1,5 +1,7 @@
 # Keryx
 
+[![CI](https://github.com/mattfinlayson/keryx/actions/workflows/ci.yml/badge.svg)](https://github.com/mattfinlayson/keryx/actions/workflows/ci.yml)
+
 A macOS menubar utility that watches a directory for files written by
 scheduled jobs / agents and gives you a native way to receive them:
 

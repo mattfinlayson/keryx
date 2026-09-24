@@ -6,10 +6,23 @@ on:
   pull_request:
 
 jobs:
-  test:
+  test-linux:
+    # Full TDD suite: KeryxKit core on Linux Foundation (matches dev toolchain).
     runs-on: ubuntu-latest
     container: swift:6.4.0-resolute
     steps:
       - uses: actions/checkout@v4
       - name: Run core test suite (Swift Testing)
+        run: swift test
+
+  test-macos:
+    # Real-world validation: the whole package including the AppKit menubar
+    # shell only compiles on macOS; the core suite also runs against Darwin
+    # Foundation, catching Darwin vs corelibs behavior differences.
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Release build (AppKit shell)
+        run: swift build -c release
+      - name: Run core test suite on Darwin
         run: swift test
