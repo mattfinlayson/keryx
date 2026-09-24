@@ -48,7 +48,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     init(store: SettingsStore) {
         self.store = store
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 520, height: 250),
+            contentRect: NSRect(x: 0, y: 0, width: 520, height: 310),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -96,6 +96,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         let ageRow = row(views: [ageLabel, agePopup])
 
         // Opener add-rule row
+        let openersHeader = sectionHeader("Opening files")
         let openersTitle = NSTextField(labelWithString: "Open files ending in:")
         extensionField.placeholderString = "e.g. md or *.md"
         let chooseAppButton = NSButton(title: "Choose App…", target: self, action: #selector(chooseOpenerApp(_:)))
@@ -111,14 +112,36 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         rulesEmptyLabel.textColor = .secondaryLabelColor
 
         // Launch at login
+        let generalHeader = sectionHeader("General")
         launchAtLoginCheckbox.target = self
         launchAtLoginCheckbox.action = #selector(launchAtLoginToggled(_:))
         let launchRow = row(views: [launchAtLoginCheckbox])
 
-        let column = NSStackView(views: [inboxRow, ageRow, openersRow, rulesStack, rulesEmptyLabel, launchRow])
+        let footerLabel = NSTextField(labelWithString: "Keryx \(appVersion)")
+        footerLabel.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+        footerLabel.textColor = .tertiaryLabelColor
+
+        let column = NSStackView(views: [
+            sectionHeader("Inbox"),
+            inboxRow,
+            sectionHeader("Visibility"),
+            ageRow,
+            openersHeader,
+            openersRow,
+            rulesStack,
+            rulesEmptyLabel,
+            generalHeader,
+            launchRow,
+            footerLabel,
+        ])
         column.orientation = .vertical
         column.alignment = .leading
-        column.spacing = 12
+        column.spacing = 10
+        column.setCustomSpacing(18, after: inboxRow)
+        column.setCustomSpacing(18, after: ageRow)
+        column.setCustomSpacing(4, after: rulesStack)
+        column.setCustomSpacing(18, after: rulesEmptyLabel)
+        column.setCustomSpacing(16, after: launchRow)
         column.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(column)
 
@@ -136,6 +159,17 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         stack.orientation = .horizontal
         stack.spacing = 8
         return stack
+    }
+
+    private func sectionHeader(_ title: String) -> NSTextField {
+        let label = NSTextField(labelWithString: title.uppercased())
+        label.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize, weight: .semibold)
+        label.textColor = .secondaryLabelColor
+        return label
+    }
+
+    private var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
     }
 
     // MARK: State sync
@@ -173,6 +207,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             trash.isBordered = false
             trash.contentTintColor = .secondaryLabelColor
             trash.ruleKey = key
+            trash.setAccessibilityLabel("Remove rule for \(key)")
             let ruleRow = row(views: [label, trash])
             rulesStack.addArrangedSubview(ruleRow)
         }
