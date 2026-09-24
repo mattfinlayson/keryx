@@ -62,10 +62,10 @@ struct InboxControllerPersistenceTests {
         InboxController(scanner: DirectoryScanner(directory: dir), seenStore: store)
     }
 
-    /// macOS resolves /var → /private/var when scanning; compare against the
-    /// resolved path so assertions match the scanner's URLs on both platforms.
-    private func pathInDir(_ name: String) -> String {
-        dir.appendingPathComponent(name).resolvingSymlinksInPath().path
+    /// macOS resolves /var → /private/var when scanning, so persisted paths
+    /// may not byte-match the constructed URL path; compare on suffixes.
+    private func containsPath(_ paths: Set<String>, _ name: String) -> Bool {
+        paths.contains { $0.hasSuffix("/" + name) }
     }
 
     @Test("new files are unseen across controller recreation")
@@ -79,7 +79,7 @@ struct InboxControllerPersistenceTests {
         try relaunched.refresh()
 
         #expect(relaunched.state.badgeCount == 1)
-        #expect(relaunched.state.unseenPaths.contains(pathInDir("job-1.md")))
+        #expect(containsPath(relaunched.state.unseenPaths, "job-1.md"))
     }
 
     @Test("opened files stay read across controller recreation")
@@ -89,14 +89,14 @@ struct InboxControllerPersistenceTests {
         let controller = makeController()
         try controller.refresh()
         controller.open(controller.state.entries.first { $0.name == "job-1.md" }!)
-        #expect(store.seenPaths.contains(pathInDir("job-1.md")))
+        #expect(containsPath(store.seenPaths, "job-1.md"))
 
         let relaunched = makeController()
         try relaunched.refresh()
 
         #expect(relaunched.state.badgeCount == 1)
-        #expect(relaunched.state.unseenPaths.contains(pathInDir("job-2.md")))
-        #expect(!relaunched.state.unseenPaths.contains(pathInDir("job-1.md")))
+        #expect(containsPath(relaunched.state.unseenPaths, "job-2.md"))
+        #expect(!containsPath(relaunched.state.unseenPaths, "job-1.md"))
     }
 
     @Test("markAllAsRead persists the seen set")
@@ -108,12 +108,12 @@ struct InboxControllerPersistenceTests {
         controller.markAllAsRead()
 
         #expect(controller.state.badgeCount == 0)
-        #expect(store.seenPaths.contains(pathInDir("job-1.md")))
+        #expect(containsPath(store.seenPaths, "job-1.md"))
     }
 
     @Test("a seeded seen path is not re-flagged unseen")
     func seededSeenStaysRead() throws {
-        defaults.set([pathInDir("ghost.md")], forKey: "seenPaths")
+        defaults.set(["/gone/ghost.md"], forKey: "seenPaths")
         defaults.synchronize()
 
         let controller = makeController()
