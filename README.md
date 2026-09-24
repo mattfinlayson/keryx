@@ -44,8 +44,19 @@ swift test    # 15+ tests over the core
 
 ### macOS (runtime)
 
-**Settings:** ⌘, from the menubar menu (or "Settings…") — pick the inbox
-directory and the fallback scan interval. Changes apply live.
+**Settings:** ⌘, from the menubar menu (or "Settings…"):
+
+- **Inbox folder** — directory picker, changes apply live
+- **Ignore files older than** — hide files whose last modification predates
+  the cutoff (Off / 1h / 3h / 6h / 12h / 1d / 2d / 3d / 7d / 14d). Useful
+  when pointing the inbox at a directory that already holds a long history
+  of output — older files never appear and never notify. A file whose
+  content is rewritten shows up again (fresh modification date).
+- **Open files ending in** — map a file extension to a specific application
+  (e.g. `md → Marked 2`), overriding the OS default handler; without a
+  rule, files open with the default app
+
+**Mark All Read** (⇧⌘K in the menu) clears every unseen flag at once.
 
 **Notifications:** the app requests notification permission on first launch
 and posts a notification when new (or newly updated) files land in the inbox.
