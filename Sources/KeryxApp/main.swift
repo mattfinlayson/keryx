@@ -45,7 +45,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             at: effectiveInboxURL(for: store.settings), withIntermediateDirectories: true)
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.button?.title = "✉"
 
         notifier.activate()
         controller.onNewFiles = { [notifier] files in
@@ -71,25 +70,75 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func render() {
+        renderMenuBarIcon()
+        renderMenu()
+    }
+
+    private func renderMenuBarIcon() {
         let state = controller.state
-        statusItem.button?.title = state.badgeCount > 0 ? "✉ \(state.badgeCount)" : "✉"
+        guard let button = statusItem.button else { return }
+        let symbolName = state.badgeCount > 0 ? "tray.full" : "tray"
+        let icon = NSImage(systemSymbolName: symbolName, accessibilityDescription: "Keryx inbox")
+        icon?.isTemplate = true
+        button.image = icon
+        button.imageHugsTitle = true
+        if state.badgeCount > 0 {
+            button.title = String(state.badgeCount)
+            button.font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .medium)
+        } else {
+            button.title = ""
+        }
+    }
+
+    private func symbol(_ name: String) -> NSImage? {
+        NSImage(systemSymbolName: name, accessibilityDescription: nil)
+    }
+
+    private func accentDot() -> NSImage? {
+        let size = NSSize(width: 9, height: 9)
+        let image = NSImage(size: size, flipped: false) { rect in
+            NSColor.controlAccentColor.setFill()
+            NSBezierPath(ovalIn: rect.insetBy(dx: 0.5, dy: 0)).fill()
+            return true
+        }
+        image.isTemplate = false
+        return image
+    }
+
+    private func relativeTime(for date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: Date())
+    }
+
+    private func renderMenu() {
+        let state = controller.state
 
         let menu = NSMenu()
-        if state.entries.isEmpty {
+        if let latest = state.latestEntry {
+            let preview = NSMenuItem(
+                title: "Latest: \(latest.name) · \(relativeTime(for: latest.modificationDate))",
+                action: nil,
+                keyEquivalent: ""
+            )
+            preview.isEnabled = false
+            menu.addItem(preview)
+        } else {
             let empty = NSMenuItem(title: "Inbox empty", action: nil, keyEquivalent: "")
             empty.isEnabled = false
             menu.addItem(empty)
-        } else {
-            for entry in state.entries {
-                let item = NSMenuItem(
-                    title: (state.unseenPaths.contains(entry.id) ? "● " : "") + entry.name,
-                    action: #selector(openFile(_:)),
-                    keyEquivalent: ""
-                )
-                item.target = self
-                item.representedObject = entry
-                menu.addItem(item)
-            }
+        }
+        menu.addItem(.separator())
+        for entry in state.entries {
+            let item = NSMenuItem(
+                title: entry.name,
+                action: #selector(openFile(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.image = state.unseenPaths.contains(entry.id) ? accentDot() : nil
+            item.representedObject = entry
+            menu.addItem(item)
         }
         menu.addItem(.separator())
         let markAll = NSMenuItem(
@@ -97,17 +146,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         markAll.keyEquivalentModifierMask = [.command, .shift]
         markAll.target = self
+        markAll.image = symbol("checkmark.circle")
         markAll.isEnabled = state.badgeCount > 0
         menu.addItem(markAll)
         let settingsItem = NSMenuItem(
             title: "Settings…", action: #selector(showSettings(_:)), keyEquivalent: ","
         )
         settingsItem.target = self
+        settingsItem.image = symbol("gearshape")
         menu.addItem(settingsItem)
+        let aboutItem = NSMenuItem(
+            title: "About Keryx", action: #selector(showAbout(_:)), keyEquivalent: ""
+        )
+        aboutItem.target = self
+        aboutItem.image = symbol("info.circle")
+        menu.addItem(aboutItem)
         menu.addItem(NSMenuItem(title: "Open Inbox Folder", action: #selector(openInboxFolder), keyEquivalent: "o"))
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Quit Keryx", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        let quitItem = NSMenuItem(title: "Quit Keryx", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        quitItem.image = symbol("power")
+        menu.addItem(quitItem)
         statusItem.menu = menu
+    }
+
+    @objc func showAbout(_ sender: Any) {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        let alert = NSAlert()
+        alert.messageText = "Keryx"
+        alert.informativeText = version.map { "Version \($0)" } ?? "Development build"
+        alert.runModal()
     }
 
     @objc func openFile(_ sender: NSMenuItem) {
