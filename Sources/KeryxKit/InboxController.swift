@@ -4,7 +4,11 @@ import Foundation
 /// macOS, interval polling elsewhere.
 public enum InboxWatchers {
     public static func platformDefault(directory: URL, interval: TimeInterval) -> any InboxWatcher {
-        PollingInboxWatcher(directory: directory, interval: interval)
+        #if os(macOS)
+        return VnodeInboxWatcher(directory: directory)
+        #else
+        return PollingInboxWatcher(directory: directory, interval: interval)
+        #endif
     }
 }
 
