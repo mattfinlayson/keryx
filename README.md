@@ -44,7 +44,17 @@ swift test    # 15+ tests over the core
 
 ### macOS (runtime)
 
+**Option 1 — prebuilt app:** download `Keryx-vX.Y.Z-macos.zip` from
+[Releases](https://github.com/mattfinlayson/keryx/releases), unzip, and run
+`Keryx.app`. The bundle is ad-hoc signed (not notarized), so on first launch
+macOS Gatekeeper may require right-click → Open, or
+`xattr -cr Keryx.app` from Terminal.
+
+**Option 2 — from source:**
+
 ```sh
+git clone https://github.com/mattfinlayson/keryx
+cd keryx
 swift build -c release
 .build/release/KeryxApp
 ```
