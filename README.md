@@ -46,9 +46,17 @@ swift test    # 15+ tests over the core
 
 **Option 1 — prebuilt app:** download `Keryx-vX.Y.Z-macos.zip` from
 [Releases](https://github.com/mattfinlayson/keryx/releases), unzip, and run
-`Keryx.app`. The bundle is ad-hoc signed (not notarized), so on first launch
-macOS Gatekeeper may require right-click → Open, or
-`xattr -cr Keryx.app` from Terminal.
+`Keryx.app`. The bundle is ad-hoc signed (not notarized — see
+[issue #1](https://github.com/mattfinlayson/keryx/issues/1)), so on first
+launch Gatekeeper will block it. Either run
+
+```sh
+xattr -cr /path/to/Keryx.app
+```
+
+or open **System Settings → Privacy & Security**, scroll to the warning, and
+click **Open Anyway** (right-click → Open is no longer sufficient on recent
+macOS). This is a one-time step per downloaded copy.
 
 **Option 2 — from source:**
 
