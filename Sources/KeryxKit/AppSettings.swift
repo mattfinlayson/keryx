@@ -16,13 +16,33 @@ public struct AppSettings: Equatable, Sendable {
     public init(inboxURL: URL?, maxFileAge: TimeInterval? = nil, openers: [String: String] = [:]) {
         self.inboxURL = inboxURL
         self.maxFileAge = maxFileAge
+        // Normalize keys so "*.md", ".MD", and "md" are the same rule;
+        // a bare "*" is kept as the all-files fallback.
         var normalized: [String: String] = [:]
         for (extension_, app) in openers {
-            let key = extension_.trimmingCharacters(in: .whitespaces)
-            if key.hasPrefix(".") { normalized[String(key.dropFirst()).lowercased()] = app }
-            else if !key.isEmpty { normalized[key.lowercased()] = app }
+            if let key = Self.normalizeOpenerKey(extension_) {
+                normalized[key] = app
+            }
         }
         self.openers = normalized
+    }
+
+    /// The app set for this extension, falling back to a `*` (all files)
+    /// rule. `in` lets callers overlay additional rules (e.g. env overrides).
+    public func opener(forExtension extension_: String, in extra: [String: String] = [:]) -> String? {
+        let candidates: [String: String] = extra.merging(openers) { _, new in new }
+        var key = extension_.lowercased()
+        if key.hasPrefix(".") { key = String(key.dropFirst()) }
+        guard !key.isEmpty else { return nil }
+        return candidates[key] ?? candidates["*"]
+    }
+
+    private static func normalizeOpenerKey(_ raw: String) -> String? {
+        var key = raw.trimmingCharacters(in: .whitespaces).lowercased()
+        if key.hasPrefix("*.") { key = String(key.dropFirst(2)) }
+        else if key.hasPrefix(".") { key = String(key.dropFirst(1)) }
+        if key.isEmpty || key == "*" { return raw.trimmingCharacters(in: .whitespaces) == "*" ? "*" : nil }
+        return key
     }
 }
 

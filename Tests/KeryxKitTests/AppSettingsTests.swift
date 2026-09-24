@@ -27,6 +27,40 @@ struct AppSettingsTests {
 
         #expect(store.settings == settings)
     }
+
+    @Test("opener extension keys are normalized: *.md, .MD, and md are equivalent")
+    func normalizesOpenerKeys() {
+        let settings = AppSettings(
+            inboxURL: nil,
+            openers: ["*.md": "Marked 2", ".LOG": "Console", " txt ": "TextEdit"]
+        )
+
+        #expect(settings.openers.keys.sorted() == ["log", "md", "txt"])
+        #expect(settings.openers["md"] == "Marked 2")
+        #expect(settings.openers["log"] == "Console")
+        #expect(settings.openers["txt"] == "TextEdit")
+    }
+
+    @Test("a bare * rule is kept and acts as the all-files fallback")
+    func starRuleIsPreserved() {
+        let settings = AppSettings(inboxURL: nil, openers: ["*": "Marked 2"])
+
+        #expect(settings.openers == ["*": "Marked 2"])
+    }
+
+    @Test("opener(forExtension:) prefers the exact match, then the * rule, then nil")
+    func openerLookup() {
+        let settings = AppSettings(
+            inboxURL: nil,
+            openers: ["*.md": "Marked 2", "*": "TextEdit"]
+        )
+
+        #expect(settings.opener(forExtension: "md") == "Marked 2")
+        #expect(settings.opener(forExtension: "MD") == "Marked 2")
+        #expect(settings.opener(forExtension: ".md") == "Marked 2")
+        #expect(settings.opener(forExtension: "log") == "TextEdit")
+        #expect(settings.opener(forExtension: "") == nil)
+    }
 }
 
 @Suite("UserDefaultsSettingsStore")
