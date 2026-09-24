@@ -21,6 +21,7 @@ public struct DirectoryScanner {
             includingPropertiesForKeys: attributes,
             options: [.skipsHiddenFiles, .skipsPackageDescendants]
         )
+        guard let enumerator else { return [] }
 
         var entries: [FileEntry] = []
         for case let url as URL in enumerator {

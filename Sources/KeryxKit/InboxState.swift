@@ -16,10 +16,11 @@ public struct InboxState: Sendable {
     @discardableResult
     public mutating func insert(_ entry: FileEntry) -> Bool {
         if let index = entries.firstIndex(where: { $0.id == entry.id }) {
-            guard entries[index].modificationDate != entry.modificationDate else {
-                return false
-            }
+            let isUpdate = entries[index].modificationDate < entry.modificationDate
+            guard isUpdate else { return false }
             entries[index] = entry
+            // New content counts as new: re-flag it unseen.
+            unseenPaths.insert(entry.id)
         } else {
             entries.append(entry)
             unseenPaths.insert(entry.id)

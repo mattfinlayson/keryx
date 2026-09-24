@@ -58,7 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Open Inbox Folder", action: #selector(openInbox(_:)), keyEquivalent: "o"))
+        menu.addItem(NSMenuItem(title: "Open Inbox Folder", action: #selector(openInboxFolder), keyEquivalent: "o"))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit Keryx", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         statusItem.menu = menu

@@ -32,6 +32,19 @@ struct InboxStateTests {
         #expect(state.entries.count == 1)
     }
 
+    @Test("re-inserting a file with a newer modification date re-marks it unseen")
+    mutating func updatedFileIsUnseenAgain() {
+        var state = InboxState()
+        state.insert(entry("report.md", modified: Date(timeIntervalSince1970: 100)))
+        state.markOpened(path: "/tmp/inbox/report.md")
+
+        // Agent overwrote the file with new output.
+        state.insert(entry("report.md", modified: Date(timeIntervalSince1970: 200)))
+
+        #expect(state.badgeCount == 1)
+        #expect(state.unseenPaths.contains("/tmp/inbox/report.md"))
+    }
+
     @Test("markOpened clears the unseen flag and the badge")
     mutating func openClearsUnseen() {
         var state = InboxState()
