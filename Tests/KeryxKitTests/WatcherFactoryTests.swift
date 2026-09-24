@@ -10,7 +10,7 @@ struct WatcherFactoryTests {
     #if os(Linux)
     @Test("Linux falls back to interval polling")
     func linuxUsesPolling() {
-        let watcher = InboxWatchers.platformDefault(directory: dir, interval: 3.0)
+        let watcher = InboxWatchers.platformDefault(directory: dir)
 
         #expect(watcher is PollingInboxWatcher)
     }

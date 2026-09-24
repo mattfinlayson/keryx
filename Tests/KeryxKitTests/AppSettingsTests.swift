@@ -5,31 +5,27 @@ import Foundation
 @Suite("AppSettings")
 struct AppSettingsTests {
 
-    @Test("default settings use the home inbox and a 2s scan interval")
+    @Test("default settings use the home inbox, unlimited age, no opener rules")
     func defaults() {
         let settings = AppSettings.default
 
-        #expect(settings.scanInterval == 2.0)
         #expect(settings.inboxURL == nil)
-    }
-
-    @Test("scan interval below the minimum is clamped")
-    func clampsInterval() {
-        #expect(AppSettings(inboxURL: nil, scanInterval: 0.05).scanInterval == 0.5)
-        #expect(AppSettings(inboxURL: nil, scanInterval: -1).scanInterval == 0.5)
-        #expect(AppSettings(inboxURL: nil, scanInterval: 30).scanInterval == 30)
+        #expect(settings.maxFileAge == nil)
+        #expect(settings.openers.isEmpty)
     }
 
     @Test("in-memory store round-trips settings")
     func inMemoryStoreRoundTrip() {
         let store = InMemorySettingsStore()
-        let url = URL(fileURLWithPath: "/tmp/inbox")
-        let settings = AppSettings(inboxURL: url, scanInterval: 5)
+        let settings = AppSettings(
+            inboxURL: URL(fileURLWithPath: "/tmp/inbox"),
+            maxFileAge: 86400,
+            openers: ["md": "Marked 2"]
+        )
 
         store.save(settings)
 
         #expect(store.settings == settings)
-        #expect(store.settings.inboxURL == url)
     }
 }
 
@@ -40,16 +36,21 @@ struct UserDefaultsSettingsStoreTests {
         UserDefaultsSettingsStore(userDefaults: UserDefaults(suiteName: "keryx-test-\(UUID().uuidString)")!)
     }
 
-    @Test("round-trips inbox path and scan interval")
+    @Test("round-trips inbox path, max file age, and opener rules")
     func roundTrip() {
         let store = makeStore()
-        let settings = AppSettings(inboxURL: URL(fileURLWithPath: "/tmp/my-inbox"), scanInterval: 7)
+        let settings = AppSettings(
+            inboxURL: URL(fileURLWithPath: "/tmp/my-inbox"),
+            maxFileAge: 7 * 86400,
+            openers: ["md": "Marked 2", "log": "Console"]
+        )
 
         store.save(settings)
 
         #expect(store.settings == settings)
         #expect(store.settings.inboxURL?.path == "/tmp/my-inbox")
-        #expect(store.settings.scanInterval == 7)
+        #expect(store.settings.maxFileAge == 7.0 * 86400)
+        #expect(store.settings.openers == ["md": "Marked 2", "log": "Console"])
     }
 
     @Test("returns defaults when nothing was saved")
@@ -62,11 +63,10 @@ struct UserDefaultsSettingsStoreTests {
     @Test("overwrites previously saved settings")
     func overwrites() {
         let store = makeStore()
-        store.save(AppSettings(inboxURL: URL(fileURLWithPath: "/tmp/a"), scanInterval: 2))
-        store.save(AppSettings(inboxURL: URL(fileURLWithPath: "/tmp/b"), scanInterval: 10))
+        store.save(AppSettings(inboxURL: URL(fileURLWithPath: "/tmp/a"), maxFileAge: 60))
+        store.save(AppSettings(inboxURL: URL(fileURLWithPath: "/tmp/b"), maxFileAge: nil))
 
         #expect(store.settings.inboxURL?.path == "/tmp/b")
-        #expect(store.settings.scanInterval == 10 || store.settings.scanInterval == 10)
-        #expect(store.settings == AppSettings(inboxURL: URL(fileURLWithPath: "/tmp/b"), scanInterval: 10))
+        #expect(store.settings.maxFileAge == nil)
     }
 }

@@ -2,18 +2,27 @@ import Foundation
 
 /// User-configurable app settings.
 public struct AppSettings: Equatable, Sendable {
+    /// nil means "use the platform default inbox".
     public let inboxURL: URL?
-    public let scanInterval: TimeInterval
+    /// Files modified longer ago than this are ignored entirely.
+    /// nil means unlimited.
+    public let maxFileAge: TimeInterval?
+    /// File extension (lowercased, without dot) -> application name or path
+    /// used to open matching files, overriding the OS default handler.
+    public let openers: [String: String]
 
-    /// Fallback scan interval floor, in seconds (only used by polling
-    /// watchers; event-driven watchers push immediately).
-    public static let minimumScanInterval: TimeInterval = 0.5
+    public static let `default` = AppSettings(inboxURL: nil, maxFileAge: nil, openers: [:])
 
-    public static let `default` = AppSettings(inboxURL: nil, scanInterval: 2.0)
-
-    public init(inboxURL: URL?, scanInterval: TimeInterval) {
+    public init(inboxURL: URL?, maxFileAge: TimeInterval? = nil, openers: [String: String] = [:]) {
         self.inboxURL = inboxURL
-        self.scanInterval = max(AppSettings.minimumScanInterval, scanInterval)
+        self.maxFileAge = maxFileAge
+        var normalized: [String: String] = [:]
+        for (extension_, app) in openers {
+            let key = extension_.trimmingCharacters(in: .whitespaces)
+            if key.hasPrefix(".") { normalized[String(key.dropFirst()).lowercased()] = app }
+            else if !key.isEmpty { normalized[key.lowercased()] = app }
+        }
+        self.openers = normalized
     }
 }
 
@@ -41,7 +50,8 @@ public final class UserDefaultsSettingsStore: SettingsStore {
     private let defaults: UserDefaults
 
     private static let inboxPathKey = "inboxPath"
-    private static let scanIntervalKey = "scanInterval"
+    private static let maxFileAgeKey = "maxFileAge"
+    private static let openersKey = "openers"
 
     public init(userDefaults: UserDefaults = .standard) {
         self.defaults = userDefaults
@@ -52,11 +62,16 @@ public final class UserDefaultsSettingsStore: SettingsStore {
         if let path = defaults.string(forKey: Self.inboxPathKey) {
             inboxURL = URL(fileURLWithPath: path)
         }
-        var interval = AppSettings.default.scanInterval
-        if defaults.object(forKey: Self.scanIntervalKey) != nil {
-            interval = defaults.double(forKey: Self.scanIntervalKey)
+        var maxFileAge: TimeInterval?
+        if defaults.object(forKey: Self.maxFileAgeKey) != nil {
+            let value = defaults.double(forKey: Self.maxFileAgeKey)
+            maxFileAge = value > 0 ? value : nil
         }
-        return AppSettings(inboxURL: inboxURL, scanInterval: interval)
+        var openers: [String: String] = [:]
+        if let stored = defaults.dictionary(forKey: Self.openersKey) as? [String: String] {
+            openers = stored
+        }
+        return AppSettings(inboxURL: inboxURL, maxFileAge: maxFileAge, openers: openers)
     }
 
     public func save(_ settings: AppSettings) {
@@ -65,6 +80,15 @@ public final class UserDefaultsSettingsStore: SettingsStore {
         } else {
             defaults.removeObject(forKey: Self.inboxPathKey)
         }
-        defaults.set(settings.scanInterval, forKey: Self.scanIntervalKey)
+        if let maxFileAge = settings.maxFileAge {
+            defaults.set(maxFileAge, forKey: Self.maxFileAgeKey)
+        } else {
+            defaults.removeObject(forKey: Self.maxFileAgeKey)
+        }
+        if settings.openers.isEmpty {
+            defaults.removeObject(forKey: Self.openersKey)
+        } else {
+            defaults.set(settings.openers, forKey: Self.openersKey)
+        }
     }
 }

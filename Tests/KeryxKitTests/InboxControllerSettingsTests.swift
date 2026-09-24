@@ -14,7 +14,7 @@ struct InboxControllerSettingsTests {
             .appendingPathComponent("keryx-ctl2-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         settingsStore = InMemorySettingsStore(
-            settings: AppSettings(inboxURL: dir, scanInterval: 2.0)
+            settings: AppSettings(inboxURL: dir)
         )
         controller = InboxController(scanner: DirectoryScanner(directory: dir))
         controller.apply(settings: settingsStore.settings)
@@ -30,10 +30,27 @@ struct InboxControllerSettingsTests {
         try FileManager.default.createDirectory(at: newDir, withIntermediateDirectories: true)
         try "output".data(using: .utf8)!.write(to: newDir.appendingPathComponent("moved-job.md"))
 
-        controller.apply(settings: AppSettings(inboxURL: newDir, scanInterval: 2.0))
+        controller.apply(settings: AppSettings(inboxURL: newDir))
         try controller.refresh()
 
         #expect(controller.state.entries.map(\.name) == ["moved-job.md"])
+    }
+
+    @Test("apply(settings:) with maxFileAge drops files older than the cutoff")
+    func ageFilterDropsOldFiles() throws {
+        let url = dir.appendingPathComponent("ancient.md")
+        try "output".data(using: .utf8)!.write(to: url)
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date().addingTimeInterval(-30 * 86400)],
+            ofItemAtPath: url.path
+        )
+        try controller.refresh()
+        #expect(controller.state.entries.count == 1)
+
+        controller.apply(settings: AppSettings(inboxURL: dir, maxFileAge: 86400))
+
+        #expect(controller.state.entries.isEmpty)
+        #expect(controller.state.badgeCount == 0)
     }
 
     @Test("onNewFiles fires once per newly-unseen file")

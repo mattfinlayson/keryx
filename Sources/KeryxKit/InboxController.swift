@@ -3,11 +3,11 @@ import Foundation
 /// Chooses the best watcher for the platform: push-based vnode watching on
 /// macOS, interval polling elsewhere.
 public enum InboxWatchers {
-    public static func platformDefault(directory: URL, interval: TimeInterval) -> any InboxWatcher {
+    public static func platformDefault(directory: URL) -> any InboxWatcher {
         #if os(macOS)
         return VnodeInboxWatcher(directory: directory)
         #else
-        return PollingInboxWatcher(directory: directory, interval: interval)
+        return PollingInboxWatcher(directory: directory)
         #endif
     }
 }
@@ -34,52 +34,54 @@ public final class InboxController {
     private var scanner: DirectoryScanner
     private weak var watcher: (any InboxWatcher)?
     private var inboxURL: URL?
-    private var scanInterval: TimeInterval
+    private var maxFileAge: TimeInterval?
     private var isRunning = false
-    private let watcherFactory: (URL, TimeInterval) -> any InboxWatcher
+    private let watcherFactory: (URL) -> any InboxWatcher
     private let queue = DispatchQueue(label: "keryx.inbox.controller", qos: .utility)
     private var _state = InboxState()
 
     public init(
         scanner: DirectoryScanner,
         watcher: (any InboxWatcher)? = nil,
-        watcherFactory: @escaping (URL, TimeInterval) -> any InboxWatcher = InboxWatchers.platformDefault
+        watcherFactory: @escaping (URL) -> any InboxWatcher = InboxWatchers.platformDefault
     ) {
         self.scanner = scanner
         self.watcher = watcher
         self.inboxURL = scanner.directory
-        self.scanInterval = AppSettings.default.scanInterval
+        self.maxFileAge = scanner.maxFileAge
         self.watcherFactory = watcherFactory
     }
 
-    /// Reconfigures the controller: swaps the watched inbox, scan interval,
+    /// Reconfigures the controller: swaps the watched inbox, age filter,
     /// and watcher as needed. Safe to call while running.
     public func apply(settings: AppSettings) {
         let wasRunning = isRunning
         let url = settings.inboxURL
         let inboxChanged = (url != inboxURL)
-        let intervalChanged = (settings.scanInterval != scanInterval)
+        let ageChanged = (settings.maxFileAge != maxFileAge)
 
         inboxURL = url
-        scanInterval = settings.scanInterval
+        maxFileAge = settings.maxFileAge
 
         if inboxChanged {
             stop()
             if let url {
-                scanner = DirectoryScanner(directory: url)
-                watcher = watcherFactory(url, scanInterval)
+                scanner = DirectoryScanner(directory: url, maxFileAge: maxFileAge)
+                watcher = watcherFactory(url)
             } else {
+                scanner = DirectoryScanner(directory: URL(fileURLWithPath: "/nonexistent-keryx"), maxFileAge: nil)
                 watcher = nil
             }
             if wasRunning {
                 start()
             }
-        } else if intervalChanged, isRunning, let url = inboxURL {
-            // Polling watchers need recreation to pick up the new interval;
-            // event-driven watchers ignore it entirely.
+        } else if ageChanged, let url = inboxURL {
             stop()
-            watcher = watcherFactory(url, scanInterval)
-            start()
+            scanner = DirectoryScanner(directory: url, maxFileAge: maxFileAge)
+            watcher = watcherFactory(url)
+            if wasRunning {
+                start()
+            }
         }
 
         try? refresh()
