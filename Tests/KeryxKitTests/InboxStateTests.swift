@@ -45,6 +45,25 @@ struct InboxStateTests {
         #expect(state.unseenPaths.contains("/tmp/inbox/report.md"))
     }
 
+    @Test("latestEntry returns the newest entry")
+    mutating func latestEntry() {
+        var state = InboxState()
+        #expect(state.latestEntry == nil)
+
+        state.insert(entry("old.md", modified: Date(timeIntervalSince1970: 100)))
+        state.insert(entry("new.md", modified: Date(timeIntervalSince1970: 200)))
+
+        #expect(state.latestEntry?.name == "new.md")
+
+        // A newer insert takes over.
+        state.insert(entry("newest.md", modified: Date(timeIntervalSince1970: 300)))
+        #expect(state.latestEntry?.name == "newest.md")
+
+        // Syncing away the newest falls back to the next-newest.
+        state.sync(existingPaths: ["/tmp/inbox/old.md"])
+        #expect(state.latestEntry?.name == "old.md")
+    }
+
     @Test("markAllOpened clears every unseen flag")
     mutating func markAllOpened() {
         var state = InboxState()

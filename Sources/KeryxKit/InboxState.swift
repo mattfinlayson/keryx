@@ -11,6 +11,9 @@ public struct InboxState: Sendable {
     /// Number of unseen files; used for the menubar badge.
     public var badgeCount: Int { unseenPaths.count }
 
+    /// The most recently modified entry, or nil when the inbox is empty.
+    public var latestEntry: FileEntry? { entries.first }
+
     /// Adds or updates an entry. A brand-new path is marked unseen.
     /// Returns true if the state changed.
     @discardableResult
