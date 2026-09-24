@@ -141,7 +141,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(.separator())
         for entry in state.entries {
             let item = NSMenuItem(
-                title: entry.name,
+                title: displayName(for: entry),
                 action: #selector(openFile(_:)),
                 keyEquivalent: ""
             )
@@ -177,6 +177,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         quitItem.image = symbol("power")
         menu.addItem(quitItem)
         statusItem.menu = menu
+    }
+
+    /// Files in inbox subdirectories display as relative paths so nested
+    /// files from different jobs are distinguishable.
+    private func displayName(for entry: FileEntry) -> String {
+        let inboxPath = effectiveInboxURL(for: store.settings).path
+        let path = entry.url.path
+        guard path.hasPrefix(inboxPath + "/") else { return entry.name }
+        return String(path.dropFirst(inboxPath.count + 1))
     }
 
     @objc func showAbout(_ sender: Any) {

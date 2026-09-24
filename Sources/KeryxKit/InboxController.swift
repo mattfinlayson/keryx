@@ -5,7 +5,7 @@ import Foundation
 public enum InboxWatchers {
     public static func platformDefault(directory: URL) -> any InboxWatcher {
         #if os(macOS)
-        return VnodeInboxWatcher(directory: directory)
+        return FSEventsInboxWatcher(directory: directory)
         #else
         return PollingInboxWatcher(directory: directory)
         #endif
