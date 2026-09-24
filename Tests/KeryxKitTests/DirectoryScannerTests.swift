@@ -43,6 +43,18 @@ struct DirectoryScannerTests {
         #expect(files.map(\.name) == ["report.md"])
     }
 
+    @Test("includes files inside subdirectories (agents write to job folders)")
+    func includesSubdirectoryFiles() throws {
+        let subdir = dir.appendingPathComponent("job-2026-09-24")
+        try FileManager.default.createDirectory(at: subdir, withIntermediateDirectories: true)
+        try "output".data(using: .utf8)!.write(to: subdir.appendingPathComponent("report.md"))
+        try "root".data(using: .utf8)!.write(to: dir.appendingPathComponent("top.md"))
+
+        let files = try DirectoryScanner(directory: dir).scan()
+
+        #expect(files.map(\.name).sorted() == ["report.md", "top.md"])
+    }
+
     @Test("scanning a nonexistent directory throws")
     func nonexistentThrows() throws {
         let scanner = DirectoryScanner(directory: dir.appendingPathComponent("nope"))
