@@ -47,6 +47,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         notifier.activate()
+        notifier.onNotificationOpen = { [weak self] url in
+            DispatchQueue.main.async { [weak self] in self?.openAndMarkRead(url) }
+        }
         controller.onNewFiles = { [notifier] files in
             notifier.notifyNewFiles(files)
         }
@@ -179,16 +182,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func openFile(_ sender: NSMenuItem) {
         guard let entry = sender.representedObject as? FileEntry else { return }
-        controller.open(entry)
-        let ext = entry.url.pathExtension.lowercased()
+        openAndMarkRead(entry.url)
+        render()
+    }
+
+    /// Single source of truth for opening an inbox file: resolve the opener
+    /// (extension rule → * rule → env override → OS default) and mark read.
+    func openAndMarkRead(_ url: URL) {
+        let ext = url.pathExtension.lowercased()
         let opener = store.settings.opener(forExtension: ext, in: viewerAppName.map { ["*": $0] } ?? [:])
         if let appName = opener {
             let open = Process()
             open.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-            open.arguments = ["-a", appName, entry.url.path]
+            open.arguments = ["-a", appName, url.path]
             try? open.run()
         } else {
-            NSWorkspace.shared.open(entry.url)
+            NSWorkspace.shared.open(url)
+        }
+        if let entry = controller.state.entries.first(where: { $0.url == url }) {
+            controller.open(entry)
         }
         render()
     }
