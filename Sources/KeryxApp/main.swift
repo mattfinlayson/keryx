@@ -35,7 +35,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let inbox = effectiveInboxURL(for: settings)
         controller = InboxController(
             scanner: DirectoryScanner(directory: inbox),
-            watcherFactory: InboxWatchers.platformDefault
+            watcherFactory: InboxWatchers.platformDefault,
+            seenStore: UserDefaultsSeenStore()
         )
         super.init()
     }
@@ -176,7 +177,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
         let alert = NSAlert()
         alert.messageText = "Keryx"
-        alert.informativeText = version.map { "Version \($0)" } ?? "Development build"
+        alert.informativeText = """
+        A native menubar inbox for agent and scheduled-job output.\n\n        Keryx watches a directory for new files, flags them unread, and opens them in your viewer with a click.\n\n        \(version.map { "Version \($0)" } ?? "Development build") · © 2026 Matthew Finlayson\n        github.com/mattfinlayson/keryx
+        """
         alert.runModal()
     }
 
