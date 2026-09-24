@@ -92,6 +92,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         menu.addItem(.separator())
+        let markAll = NSMenuItem(
+            title: "Mark All Read", action: #selector(markAllRead(_:)), keyEquivalent: "k"
+        )
+        markAll.keyEquivalentModifierMask = [.command, .shift]
+        markAll.target = self
+        markAll.isEnabled = state.badgeCount > 0
+        menu.addItem(markAll)
         let settingsItem = NSMenuItem(
             title: "Settings…", action: #selector(showSettings(_:)), keyEquivalent: ","
         )
@@ -106,7 +113,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func openFile(_ sender: NSMenuItem) {
         guard let entry = sender.representedObject as? FileEntry else { return }
         controller.open(entry)
-        if let appName = viewerAppName {
+        let ext = entry.url.pathExtension.lowercased()
+        let opener = store.settings.openers[ext] ?? viewerAppName
+        if let appName = opener {
             let open = Process()
             open.executableURL = URL(fileURLWithPath: "/usr/bin/open")
             open.arguments = ["-a", appName, entry.url.path]
@@ -114,6 +123,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             NSWorkspace.shared.open(entry.url)
         }
+        render()
+    }
+
+    @objc func markAllRead(_ sender: Any) {
+        controller.markAllAsRead()
         render()
     }
 
