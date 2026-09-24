@@ -109,6 +109,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return image
     }
 
+    /// Same footprint as the unseen dot, invisible — keeps read/unread rows
+    /// text-aligned in the menu (items without images shift left).
+    private func blankDot() -> NSImage? {
+        NSImage(size: NSSize(width: 9, height: 9), flipped: false) { _ in true }
+    }
+
     private func relativeTime(for date: Date) -> String {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
@@ -140,7 +146,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 keyEquivalent: ""
             )
             item.target = self
-            item.image = state.unseenPaths.contains(entry.id) ? accentDot() : nil
+            item.image = state.unseenPaths.contains(entry.id) ? accentDot() : blankDot()
             item.representedObject = entry
             menu.addItem(item)
         }
