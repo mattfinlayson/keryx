@@ -4,8 +4,9 @@ import UniformTypeIdentifiers
 import KeryxKit
 
 /// Settings window: pick the inbox directory, hide files older than a
-/// cutoff, and map file extensions to specific applications. Changes apply
-/// live (no OK/Cancel), matching macOS conventions.
+/// cutoff, map file extensions to specific applications, and toggle
+/// launch-at-login. Changes apply live (no OK/Cancel), matching macOS
+/// conventions.
 @MainActor
 final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     var onApply: ((AppSettings) -> Void)?
@@ -13,10 +14,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let store: SettingsStore
     private let pathField = NSTextField()
     private let agePopup = NSPopUpButton(frame: .zero, pullsDown: false)
-    private let openersSummary = NSTextField(labelWithString: "")
     private let extensionField = NSTextField()
-    private let openerAppLabel = NSTextField(labelWithString: "default app")
-    private let removeRuleButton = NSButton(title: "Remove Rule", target: nil, action: nil)
+    private let rulesStack = NSStackView()
+    private let rulesEmptyLabel = NSTextField(labelWithString: "")
+    private let launchAtLoginCheckbox = NSButton(checkboxWithTitle: "Launch at Login", target: nil, action: nil)
 
     /// (display label, seconds) pairs; seconds nil = no age limit.
     private static let ageOptions: [(String, TimeInterval?)] = [
@@ -35,7 +36,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     init(store: SettingsStore) {
         self.store = store
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 480, height: 210),
+            contentRect: NSRect(x: 0, y: 0, width: 520, height: 250),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -82,24 +83,27 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         agePopup.action = #selector(ageChanged(_:))
         let ageRow = row(views: [ageLabel, agePopup])
 
-        // Opener rules row
+        // Opener add-rule row
         let openersTitle = NSTextField(labelWithString: "Open files ending in:")
         extensionField.placeholderString = "e.g. md or *.md"
-        extensionField.target = self
-        extensionField.action = #selector(openersEdited(_:))
-        openerAppLabel.lineBreakMode = .byTruncatingMiddle
         let chooseAppButton = NSButton(title: "Choose App…", target: self, action: #selector(chooseOpenerApp(_:)))
         chooseAppButton.bezelStyle = .rounded
-        removeRuleButton.bezelStyle = .rounded
-        removeRuleButton.target = self
-        removeRuleButton.action = #selector(removeRule(_:))
-        let openersRow = row(views: [openersTitle, extensionField, openerAppLabel, chooseAppButton, removeRuleButton])
-        extensionField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        let openersRow = row(views: [openersTitle, extensionField, chooseAppButton])
 
-        openersSummary.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
-        openersSummary.textColor = .secondaryLabelColor
+        // Rule rows (one per opener rule, each with a trashcan button)
+        rulesStack.orientation = .vertical
+        rulesStack.alignment = .leading
+        rulesStack.spacing = 4
 
-        let column = NSStackView(views: [inboxRow, ageRow, openersRow, openersSummary])
+        rulesEmptyLabel.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+        rulesEmptyLabel.textColor = .secondaryLabelColor
+
+        // Launch at login
+        launchAtLoginCheckbox.target = self
+        launchAtLoginCheckbox.action = #selector(launchAtLoginToggled(_:))
+        let launchRow = row(views: [launchAtLoginCheckbox])
+
+        let column = NSStackView(views: [inboxRow, ageRow, openersRow, rulesStack, rulesEmptyLabel, launchRow])
         column.orientation = .vertical
         column.alignment = .leading
         column.spacing = 12
@@ -110,7 +114,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             column.topAnchor.constraint(equalTo: content.topAnchor, constant: 20),
             column.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
             column.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20),
-            pathField.widthAnchor.constraint(greaterThanOrEqualToConstant: 180),
+            pathField.widthAnchor.constraint(greaterThanOrEqualToConstant: 200),
+            extensionField.widthAnchor.constraint(equalToConstant: 160),
         ])
     }
 
@@ -131,33 +136,41 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         let index = Self.ageOptions.firstIndex { $0.1 != nil && $0.1 == age } ?? (age == nil ? 0 : 1)
         agePopup.selectItem(at: index)
 
-        updateOpenersUI(with: settings)
+        rebuildRuleRows(with: settings)
+
+        launchAtLoginCheckbox.state = LaunchAtLogin.isEnabled ? .on : .off
     }
 
-    private func updateOpenersUI(with settings: AppSettings) {
-        let ext = normalizedExtension()
-        if let app = settings.openers[ext] {
-            openerAppLabel.stringValue = app
-        } else {
-            openerAppLabel.stringValue = "default app"
+    private func rebuildRuleRows(with settings: AppSettings) {
+        rulesStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+
+        let rules = settings.openers.sorted { $0.key < $1.key }
+        if rules.isEmpty {
+            rulesEmptyLabel.stringValue = "No overrides — all files open with the OS default app."
+            rulesEmptyLabel.isHidden = false
+            return
         }
-        removeRuleButton.isEnabled = !settings.openers.isEmpty
-        let summary = settings.openers
-            .sorted { $0.key < $1.key }
-            .map { key, app in
-                key == "*" ? "* (all files) → \(app)" : ".\(key) → \(app)"
-            }
-            .joined(separator: "   ")
-        openersSummary.stringValue = summary.isEmpty ? "No overrides — all files open with the OS default app." : summary
-        // Prefill the extension field with the first rule when empty.
-        if extensionField.stringValue.trimmingCharacters(in: .whitespaces).isEmpty,
-           let first = settings.openers.keys.sorted().first {
-            extensionField.stringValue = first
+        rulesEmptyLabel.isHidden = true
+
+        for (key, app) in rules {
+            let display = key == "*" ? "* (all files) → \(app)" : ".\(key) → \(app)"
+            let label = NSTextField(labelWithString: display)
+            let trash = NSButton(image: NSImage(systemSymbolName: "trash", accessibilityDescription: "Remove rule")!,
+                                 target: self,
+                                 action: #selector(removeRule(_:)))
+            trash.bezelStyle = .textRounded
+            trash.isBordered = false
+            trash.contentTintColor = .secondaryLabelColor
+            trash.representedObject = key
+            let ruleRow = row(views: [label, trash])
+            rulesStack.addArrangedSubview(ruleRow)
         }
+        _ = rulesStack // keep alive with the view hierarchy
     }
 
     private func normalizedExtension() -> String {
         var ext = extensionField.stringValue.trimmingCharacters(in: .whitespaces).lowercased()
+        if ext.hasPrefix("*.") { ext = String(ext.dropFirst(2)) }
         if ext.hasPrefix(".") { ext = String(ext.dropFirst()) }
         return ext
     }
@@ -192,11 +205,16 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         apply()
     }
 
-    @objc private func openersEdited(_ sender: Any) {
-        updateOpenersUI(with: store.settings)
-    }
-
     @objc private func chooseOpenerApp(_ sender: Any) {
+        let ext = {
+            var value = extensionField.stringValue.trimmingCharacters(in: .whitespaces).lowercased()
+            if value.hasPrefix("*.") { value = String(value.dropFirst(2)) }
+            if value.hasPrefix(".") { value = String(value.dropFirst(1)) }
+            return value
+        }()
+        guard !ext.isEmpty || extensionField.stringValue.trimmingCharacters(in: .whitespaces) == "*" else { return }
+        let key = extensionField.stringValue.trimmingCharacters(in: .whitespaces) == "*" ? "*" : ext
+
         let panel = NSOpenPanel()
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
@@ -206,30 +224,52 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         panel.beginSheetModal(for: window!) { [weak self] response in
             guard response == .OK, let url = panel.url, let self else { return }
             let app = url.deletingPathExtension().lastPathComponent
-            let ext = normalizedExtension()
-            guard !ext.isEmpty else { return }
             var settings = self.store.settings
             settings = AppSettings(
                 inboxURL: settings.inboxURL,
                 maxFileAge: settings.maxFileAge,
-                openers: settings.openers.merging([ext: app]) { _, new in new }
+                openers: settings.openers.merging([key: app]) { _, new in new }
             )
             self.store.save(settings)
             self.onApply?(settings)
+            self.extensionField.stringValue = ""
             self.refreshFromStore()
         }
     }
 
-    @objc private func removeRule(_ sender: Any) {
-        let ext = normalizedExtension()
-        guard !ext.isEmpty else { return }
+    @objc private func removeRule(_ sender: NSButton) {
+        guard let key = sender.representedObject as? String else { return }
         var settings = store.settings
         var openers = settings.openers
-        openers.removeValue(forKey: ext)
+        openers.removeValue(forKey: key)
         settings = AppSettings(inboxURL: settings.inboxURL, maxFileAge: settings.maxFileAge, openers: openers)
         store.save(settings)
         onApply?(settings)
         refreshFromStore()
+    }
+
+    @objc private func launchAtLoginToggled(_ sender: Any) {
+        let wantEnabled = launchAtLoginCheckbox.state == .on
+        do {
+            if wantEnabled != LaunchAtLogin.isEnabled {
+                if wantEnabled {
+                    try LaunchAtLogin.enable()
+                } else {
+                    try LaunchAtLogin.disable()
+                }
+            }
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = "Could not update Launch at Login"
+            alert.informativeText = """
+            \(error.localizedDescription)
+
+            If the app was quarantined after download, run `xattr -cr Keryx.app`,
+            or approve it manually in System Settings → General → Login Items.
+            """
+            alert.runModal()
+        }
+        launchAtLoginCheckbox.state = LaunchAtLogin.isEnabled ? .on : .off
     }
 }
 #endif
