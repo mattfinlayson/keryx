@@ -5,18 +5,23 @@
 A macOS menubar utility that watches a directory for files written by
 scheduled jobs / agents and gives you a native way to receive them:
 
-- **Menubar icon with an unseen count badge** — turns into `✉ N` when files
-  arrive and stays that way until you click them.
-- **Click a file** in the menu to open it in your markdown viewer of choice
-  (or the default handler) and clear its "new" flag.
+- **Menubar Caduceus icon with an unread count** — the count appears (in
+  monospaced digits) when files arrive and clears as you read them.
+- **Push-based watching** — the whole inbox subtree is watched via FSEvents,
+  so files landing in job subdirectories notify within milliseconds; no
+  polling delay. (Linux falls back to interval polling.)
+- **Click a file** in the menu or a notification to open it in your markdown
+  viewer of choice (or the default handler) and clear its "new" flag.
+- **Read state persists across launches** — opened files stay read; only
+  genuinely new (or rewritten) files re-flag unread.
 - **Files removed from disk** disappear from the menu on the next scan.
 
 ## Architecture
 
 | Target | Contents | Builds on |
 |--------|----------|-----------|
-| `KeryxKit` | Platform-independent core: `InboxState` (unseen/badge state machine), `DirectoryScanner`, `InboxWatcher` (polling + event-driven vnode on macOS), `AppSettings` + stores, `InboxController` | Linux + macOS, fully unit-tested (Swift Testing) |
-| `KeryxApp` | Thin AppKit menubar shell (`NSStatusItem`, settings window, user notifications), guarded with `#if os(macOS)` | macOS only (no-op placeholder binary on Linux) |
+| `KeryxKit` | Platform-independent core: `InboxState` (unseen/seen state machine), `DirectoryScanner`, `InboxWatcher` (interval polling + FSEvents subtree watcher on macOS), `AppSettings` + `SeenStore`, `InboxController` | Linux + macOS, fully unit-tested (Swift Testing) |
+| `KeryxApp` | Thin AppKit menubar shell (`NSStatusItem`, settings window, user notifications, login item), guarded with `#if os(macOS)` | macOS only (no-op placeholder binary on Linux) |
 
 The development loop is entirely on Linux: every behavior is TDD'd in
 `KeryxKit`, which knows nothing about AppKit. The macOS shell is a thin
@@ -39,7 +44,7 @@ tar zxf swiftly-$(uname -m).tar.gz && ./swiftly init --assume-yes
 sudo apt-get install binutils-gold libcurl4-openssl-dev libxml2-dev libz3-dev pkg-config
 
 swift build   # whole package builds on Linux (AppKit part is #if-guarded)
-swift test    # 15+ tests over the core
+swift test    # 46 tests over the core
 ```
 
 ### macOS (runtime)
@@ -62,21 +67,24 @@ swift test    # 15+ tests over the core
 (SMAppService); approve in System Settings → General → Login Items if macOS
 asks. Requires the bundled app (not the bare `swift build` binary).
 
-**Menubar:** a template-image tray icon that tints with light/dark menu bars
-and swaps to a full-tray glyph with an unread count when files arrive. The
-menu shows a latest-file preview (name + relative time), per-file unseen
-markers, and SF Symbol icons on actions.
+**Menubar:** a hand-drawn caduceus as a monochrome template image that tints
+with light/dark menu bars, with an unread count in monospaced digits when
+files arrive. The menu shows a latest-file preview (path + relative time),
+per-file unseen markers, nested files as paths relative to the inbox root,
+and SF Symbol icons on actions.
 
 **Notifications:** the app requests notification permission on first launch
-and posts a notification when new (or newly updated) files land in the inbox.
-**Clicking a notification opens the newest file** (via the same opener rules
-as the menu) and marks it read. Watching is push-based on macOS (vnode
-events) — no polling delay.
+and posts a notification when new (or newly updated) files land anywhere in
+the inbox subtree. **Clicking a notification opens the newest file** (via the
+same opener rules as the menu) and marks it read. Watching is push-based on
+macOS (FSEvents file events over the subtree, lightly debounced) — no
+polling delay.
 
 **Read state persists across launches** — files you've opened stay read when
 the app restarts; only genuinely new (or rewritten) files re-flag unread.
 
-**About:** "About Keryx" in the menu shows the app version.
+**About:** "About Keryx" in the menu shows the app's purpose, version, and
+author.
 
 **Option 1 — prebuilt app:** download `Keryx-vX.Y.Z-macos.zip` from
 [Releases](https://github.com/mattfinlayson/keryx/releases), unzip, and run
@@ -110,7 +118,8 @@ swift build -c release
 
 ### Roadmap ideas
 
-- Swap `PollingInboxWatcher` for an FSEvents/`DispatchSource` vnode watcher
-  on macOS behind the existing `InboxWatcher` protocol.
-- Persist unseen state across relaunches.
-- Menu icons/preview per file type.
+- FSEvents watcher hardening: re-arm on inbox folder recreation/move.
+- Menu row context actions (reveal in Finder, copy path).
+- Background-launch handling: opening a notification while the app is not
+  running should reliably open the file after launch.
+- Per-rule opener UI for wildcards beyond `*` (e.g. `*.log` → tail viewer).
