@@ -98,7 +98,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func caduceusImage() -> NSImage? {
         let size = NSSize(width: 16, height: 16)
         let image = NSImage(size: size, flipped: true) { _ in
-            drawCaduceus(px: 16, color: .black)
+            self.drawCaduceus(px: 16, color: .black)
             return true
         }
         image.isTemplate = true
