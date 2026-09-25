@@ -128,8 +128,8 @@ swift build -c release
 
 The first complete version of Keryx — toolchain setup, TDD'd core, menubar
 app, settings, notifications, CI, and releases — was built in one working
-session with the [pi coding agent](https://github.com/earendil-works) using
-the Compound Engineering workflow, running **glm-5.3-flash on Ollama Cloud**
-at a total token cost of **$2.56**.
+session with the [pi coding agent](https://www.npmjs.com/package/@earendil-works/pi-coding-agent)
+using the Compound Engineering workflow, running **glm-5.3-flash on Ollama
+Cloud** at a total token cost of **$2.56**.
 
 [![Built With Compound Engineering](https://img.shields.io/badge/Built%20With-Compound%20Engineering-6b46c1)](https://github.com/earendil-works)
