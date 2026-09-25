@@ -81,9 +81,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func renderMenuBarIcon() {
         let state = controller.state
         guard let button = statusItem.button else { return }
-        let symbolName = state.badgeCount > 0 ? "tray.full" : "tray"
-        let icon = NSImage(systemSymbolName: symbolName, accessibilityDescription: "Keryx inbox")
-        icon?.isTemplate = true
+        let icon = caduceusImage()
         button.image = icon
         button.imageHugsTitle = true
         if state.badgeCount > 0 {
@@ -92,6 +90,64 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             button.title = ""
         }
+    }
+
+    /// Caduceus drawn as a monochrome template image (tints with the menu
+    /// bar). Geometry designed in a 16×16 unit space, y-down; validated by
+    /// rendering the same paths off-platform before porting.
+    private func caduceusImage() -> NSImage? {
+        let size = NSSize(width: 16, height: 16)
+        let image = NSImage(size: size, flipped: true) { _ in
+            drawCaduceus(px: 16, color: .black)
+            return true
+        }
+        image.isTemplate = true
+        image.accessibilityDescription = "Keryx inbox"
+        return image
+    }
+
+    private func drawCaduceus(px: CGFloat, color: NSColor) {
+        let s = px / 16.0
+        color.setStroke()
+        color.setFill()
+
+        func path(_ points: [(CGFloat, CGFloat)], _ width: CGFloat) {
+            let p = NSBezierPath()
+            p.move(to: NSPoint(x: points[0].0 * s, y: points[0].1 * s))
+            for point in points.dropFirst() {
+                p.line(to: NSPoint(x: point.0 * s, y: point.1 * s))
+            }
+            p.lineWidth = width * s
+            p.lineCapStyle = .round
+            p.lineJoinStyle = .round
+            p.stroke()
+        }
+        func dot(_ x: CGFloat, _ y: CGFloat, _ r: CGFloat) {
+            NSBezierPath(ovalIn: NSRect(x: (x - r) * s, y: (y - r) * s,
+                                        width: 2 * r * s, height: 2 * r * s)).fill()
+        }
+        func snake(phase: Double) -> [(CGFloat, CGFloat)] {
+            let n = 40
+            return (0...n).map { i in
+                let t = Double(i) / Double(n)
+                let y = 5.4 + t * 7.6
+                let x = 8.0 + 2.1 * sin(t * .pi * 2.1 + phase)
+                return (CGFloat(x), CGFloat(y))
+            }
+        }
+
+        dot(8, 1.7, 1.05)                       // ball
+        path([(8, 2.9), (8, 15.1)], 1.35)       // staff
+        for side in [-1.0, 1.0] {               // wings
+            path([(8 + side * 0.6, 3.6), (8 + side * 3.4, 2.2), (8 + side * 4.9, 1.5)], 1.1)
+            path([(8 + side * 0.6, 4.8), (8 + side * 2.9, 3.9), (8 + side * 4.3, 3.9)], 1.1)
+        }
+        let snakeA = snake(phase: 0)            // two snakes, mirrored weaves
+        let snakeB = snake(phase: .pi)
+        path(snakeA, 1.15)
+        path(snakeB, 1.15)
+        dot(snakeA.last!.0 + 0.35, snakeA.last!.1 + 0.1, 0.8)  // heads
+        dot(snakeB.last!.0 - 0.35, snakeB.last!.1 + 0.1, 0.8)
     }
 
     private func symbol(_ name: String) -> NSImage? {

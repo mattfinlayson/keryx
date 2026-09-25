@@ -1,5 +1,5 @@
 // Generates an AppIcon.iconset for Keryx: a rounded teal tile with a white
-// tray glyph. Run on a macOS runner:
+// caduceus glyph. Run on a macOS runner:
 //   swift Scripts/make-icon.swift <output-iconset-dir>
 // then convert with: iconutil -c icns <dir> -o AppIcon.icns
 import AppKit
@@ -21,16 +21,49 @@ let sizes: [(name: String, pixels: Int)] = [
     ("icon_512x512@2x.png", 1024),
 ]
 
-// White-tinted copy of the template glyph (destinationIn keeps the glyph's alpha).
-func whiteGlyph(_ image: NSImage, size: NSSize) -> NSImage {
-    let result = NSImage(size: size, flipped: false) { rect in
-        NSColor.white.setFill()
-        rect.fill()
-        image.draw(in: rect, from: .zero, operation: .destinationIn, fraction: 1.0)
-        return true
+// Caduceus geometry in a 16×16 unit space, y-down (flipped context).
+func drawCaduceus(px: CGFloat, color: NSColor) {
+    let s = px / 16.0
+    color.setStroke()
+    color.setFill()
+
+    func path(_ points: [(CGFloat, CGFloat)], _ width: CGFloat) {
+        let p = NSBezierPath()
+        p.move(to: NSPoint(x: points[0].0 * s, y: points[0].1 * s))
+        for point in points.dropFirst() {
+            p.line(to: NSPoint(x: point.0 * s, y: point.1 * s))
+        }
+        p.lineWidth = width * s
+        p.lineCapStyle = .round
+        p.lineJoinStyle = .round
+        p.stroke()
     }
-    result.isTemplate = false
-    return result
+    func dot(_ x: CGFloat, _ y: CGFloat, _ r: CGFloat) {
+        NSBezierPath(ovalIn: NSRect(x: (x - r) * s, y: (y - r) * s,
+                                    width: 2 * r * s, height: 2 * r * s)).fill()
+    }
+    func snake(phase: Double) -> [(CGFloat, CGFloat)] {
+        let n = 60
+        return (0...n).map { i in
+            let t = Double(i) / Double(n)
+            let y = 5.4 + t * 7.6
+            let x = 8.0 + 2.1 * sin(t * .pi * 2.1 + phase)
+            return (CGFloat(x), CGFloat(y))
+        }
+    }
+
+    dot(8, 1.7, 1.05)
+    path([(8, 2.9), (8, 15.1)], 1.35)
+    for side in [-1.0, 1.0] {
+        path([(8 + side * 0.6, 3.6), (8 + side * 3.4, 2.2), (8 + side * 4.9, 1.5)], 1.1)
+        path([(8 + side * 0.6, 4.8), (8 + side * 2.9, 3.9), (8 + side * 4.3, 3.9)], 1.1)
+    }
+    let snakeA = snake(phase: 0)
+    let snakeB = snake(phase: .pi)
+    path(snakeA, 1.15)
+    path(snakeB, 1.15)
+    dot(snakeA.last!.0 + 0.35, snakeA.last!.1 + 0.1, 0.8)
+    dot(snakeB.last!.0 - 0.35, snakeB.last!.1 + 0.1, 0.8)
 }
 
 try FileManager.default.createDirectory(
@@ -59,23 +92,17 @@ for (name, pixels) in sizes {
     )!
     gradient.draw(in: tile, angle: -90)
 
-    if let base = NSImage(systemSymbolName: "tray", accessibilityDescription: nil) {
-        let configured = base.withSymbolConfiguration(
-            NSImage.SymbolConfiguration(pointSize: px * 0.42, weight: .medium)
-        ) ?? base
-        let glyphSize = configured.size
-        let scale = min((px * 0.52) / glyphSize.width, (px * 0.52) / glyphSize.height)
-        let drawSize = NSSize(width: glyphSize.width * scale, height: glyphSize.height * scale)
-        let drawRect = NSRect(
-            x: (px - drawSize.width) / 2, y: (px - drawSize.height) / 2,
-            width: drawSize.width, height: drawSize.height
-        )
-        let glyph = whiteGlyph(configured, size: drawSize)
-        glyph.draw(in: drawRect)
-    } else {
-        // Defensive: symbol unavailable — fall back to a plain tile.
-        FileHandle.standardError.write("warning: tray symbol unavailable\n".data(using: .utf8)!)
+    // White caduceus centered on the tile, ~58% of the tile edge.
+    let glyphEdge = px * 0.58
+    let whiteCaduceus = NSImage(size: NSSize(width: glyphEdge, height: glyphEdge), flipped: true) { _ in
+        drawCaduceus(px: glyphEdge, color: .white)
+        return true
     }
+    let drawRect = NSRect(
+        x: (px - glyphEdge) / 2, y: (px - glyphEdge) / 2,
+        width: glyphEdge, height: glyphEdge
+    )
+    whiteCaduceus.draw(in: drawRect)
 
     NSGraphicsContext.restoreGraphicsState()
 
