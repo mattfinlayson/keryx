@@ -87,4 +87,8 @@ Key invariants:
 - Requirements live in `docs/brainstorms/`, implementation plans in `docs/plans/`.
   Plans carry `status: active|completed` frontmatter — flip to `completed` when
   a plan fully ships.
+- `docs/solutions/` — documented solutions to past problems (bugs, best
+  practices, workflow patterns), organized by category with YAML frontmatter
+  (`module`, `tags`, `problem_type`). Relevant when implementing or debugging
+  in documented areas.
 - Open work is tracked as GitHub issues (e.g., #1: notarization).
