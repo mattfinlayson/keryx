@@ -123,3 +123,13 @@ swift build -c release
 - Background-launch handling: opening a notification while the app is not
   running should reliably open the file after launch.
 - Per-rule opener UI for wildcards beyond `*` (e.g. `*.log` → tail viewer).
+
+## Building it
+
+The first complete version of Keryx — toolchain setup, TDD'd core, menubar
+app, settings, notifications, CI, and releases — was built in one working
+session with the [pi coding agent](https://github.com/earendil-works) using
+the Compound Engineering workflow, running **glm-5.3-flash on Ollama Cloud**
+at a total token cost of **$2.56**.
+
+[![Built With Compound Engineering](https://img.shields.io/badge/Built%20With-Compound%20Engineering-6b46c1)](https://github.com/earendil-works)
