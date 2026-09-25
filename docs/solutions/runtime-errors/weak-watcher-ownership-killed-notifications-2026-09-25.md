@@ -138,7 +138,10 @@ global concurrent queue silently misbehaved on top of the ownership bug.
 
 ## Related Issues
 
-- GitHub issue #1 (notarization) — unrelated surface, still open.
-- The subdir blind spot (vnode watcher only saw direct children) was fixed in
-  the same release (v0.5.3) by replacing vnode watching with FSEvents
-  file-events over the whole subtree.
+- Notarization for Gatekeeper-free distribution: GitHub issue #1
+  (https://github.com/mattfinlayson/keryx/issues/1) — different surface, but
+  the same "manual Mac verification" gate applies to its release workflow
+  changes.
+- Repo README (https://github.com/mattfinlayson/keryx) — documents the
+  current watcher architecture (FSEvents subtree push, polling fallback) this
+  solution's fix depends on.
