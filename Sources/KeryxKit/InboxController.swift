@@ -32,7 +32,10 @@ public final class InboxController {
     public var onNewFiles: (([FileEntry]) -> Void)?
 
     private var scanner: DirectoryScanner
-    private weak var watcher: (any InboxWatcher)?
+    /// Strongly retained: the controller owns the watcher it creates via the
+    /// factory, otherwise the watcher would deallocate immediately after
+    /// creation (its delegate is held weakly, so no cycle is created).
+    private var watcher: (any InboxWatcher)?
     private var inboxURL: URL?
     private var maxFileAge: TimeInterval?
     private var isRunning = false
@@ -53,6 +56,7 @@ public final class InboxController {
         self.maxFileAge = scanner.maxFileAge
         self.watcherFactory = watcherFactory
         self.seenStore = seenStore
+        self.watcher = watcher ?? watcherFactory(scanner.directory)
         self._state = InboxState(seenPaths: seenStore?.seenPaths ?? [])
     }
 

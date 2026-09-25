@@ -36,6 +36,26 @@ struct InboxControllerSettingsTests {
         #expect(controller.state.entries.map(\.name) == ["moved-job.md"])
     }
 
+    @Test("factory-created watcher is retained and triggers refresh")
+    func factoryWatcherRetained() async throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("keryx-retention-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let controller = InboxController(
+            scanner: DirectoryScanner(directory: dir),
+            watcherFactory: { url in PollingInboxWatcher(directory: url, interval: 0.05) }
+        )
+
+        await try confirmation("factory-created watcher delivers changes", expectedCount: 1...) { confirm in
+            controller.onChange = { confirm() }
+            controller.start()
+            defer { controller.stop() }
+
+            try "output".data(using: .utf8)!.write(to: dir.appendingPathComponent("late.md"))
+            try await Task.sleep(for: .milliseconds(300))
+        }
+    }
+
     @Test("apply(settings:) with maxFileAge drops files older than the cutoff")
     func ageFilterDropsOldFiles() throws {
         let url = dir.appendingPathComponent("ancient.md")

@@ -15,6 +15,8 @@ public final class FSEventsInboxWatcher: InboxWatcher {
 
     private let directory: URL
     private var stream: FSEventStreamRef?
+    /// FSEventStreamSetDispatchQueue requires a serial queue.
+    private let streamQueue = DispatchQueue(label: "keryx.fsevents", qos: .utility)
     private var pendingWorkItem: DispatchWorkItem?
     private var fallbackPoller: PollingInboxWatcher?
 
@@ -53,7 +55,7 @@ public final class FSEventsInboxWatcher: InboxWatcher {
             return
         }
 
-        FSEventStreamSetDispatchQueue(stream, DispatchQueue.global(qos: .utility))
+        FSEventStreamSetDispatchQueue(stream, streamQueue)
         FSEventStreamStart(stream)
         self.stream = stream
     }
