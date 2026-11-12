@@ -3,6 +3,9 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  # Manual dry run: signs, notarizes and verifies the bundle without touching
+  # a release. Use it to validate credentials before tagging.
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -14,6 +17,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Resolve version
+        id: version
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            echo "value=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=v0.0.0-dev-${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Release build
         run: swift build -c release
 
@@ -24,7 +37,7 @@ jobs:
 
       - name: Package Keryx.app
         env:
-          VERSION: ${{ github.ref_name }}
+          VERSION: ${{ steps.version.outputs.value }}
         run: |
           set -euo pipefail
           APP="Keryx.app"
@@ -51,15 +64,142 @@ jobs:
           </dict>
           </plist>
           PLIST
-          codesign --force --sign - "$APP"
-          zip -qr "Keryx-${VERSION}-macos.zip" "$APP"
+
+      # Signing is opt-in on secrets: without a Developer ID certificate the
+      # workflow still produces a runnable (ad-hoc signed) bundle so the
+      # pipeline never depends on one machine's credentials.
+      - name: Detect signing credentials
+        id: signing
+        env:
+          CERT_P12: ${{ secrets.DEVELOPER_ID_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERT_PASSWORD }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          AC_KEY_ID: ${{ secrets.AC_KEY_ID }}
+          AC_ISSUER_ID: ${{ secrets.AC_ISSUER_ID }}
+          AC_KEY_P8: ${{ secrets.AC_KEY_P8 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CERT_P12:-}" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Unsigned release::No Developer ID certificate configured — falling back to ad-hoc signing. Gatekeeper will block first launch."
+            exit 0
+          fi
+          missing=""
+          [ -n "${CERT_PASSWORD:-}" ] || missing="$missing DEVELOPER_ID_CERT_PASSWORD"
+          [ -n "${TEAM_ID:-}" ] || missing="$missing APPLE_TEAM_ID"
+          [ -n "${AC_KEY_ID:-}" ] || missing="$missing AC_KEY_ID"
+          [ -n "${AC_ISSUER_ID:-}" ] || missing="$missing AC_ISSUER_ID"
+          [ -n "${AC_KEY_P8:-}" ] || missing="$missing AC_KEY_P8"
+          if [ -n "$missing" ]; then
+            echo "::error title=Incomplete signing secrets::DEVELOPER_ID_CERT_P12 is set but these are missing:$missing"
+            exit 1
+          fi
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+
+      - name: Import Developer ID certificate
+        if: steps.signing.outputs.enabled == 'true'
+        env:
+          CERT_P12: ${{ secrets.DEVELOPER_ID_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 24)"
+          P12="$RUNNER_TEMP/cert.p12"
+          printf '%s' "$CERT_P12" | openssl base64 -d -A > "$P12"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 3600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$P12" -k "$KEYCHAIN" -P "$CERT_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security
+          # Non-interactive codesign needs the key in the partition list.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
+          # Put our keychain first in the user search list (word splitting is
+          # intentional: each existing keychain is a separate argument).
+          # shellcheck disable=SC2046
+          security list-keychain -d user -s "$KEYCHAIN" \
+            $(security list-keychain -d user | tr -d '"')
+
+          rm -f "$P12"
+          echo "KEYCHAIN_PATH=$KEYCHAIN" >> "$GITHUB_ENV"
+          security find-identity -v -p codesigning "$KEYCHAIN"
+
+      - name: Sign with Developer ID (hardened runtime + timestamp)
+        if: steps.signing.outputs.enabled == 'true'
+        run: |
+          set -euo pipefail
+          IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
+            | sed -n 's/.*"\(Developer ID Application: .*\)"/\1/p' | head -1)"
+          if [ -z "$IDENTITY" ]; then
+            echo "::error title=No Developer ID identity::The imported certificate is not a Developer ID Application certificate."
+            exit 1
+          fi
+          echo "Signing with: $IDENTITY"
+          codesign --force --options runtime --timestamp \
+            --keychain "$KEYCHAIN_PATH" --sign "$IDENTITY" Keryx.app
+          codesign --verify --strict --verbose=4 Keryx.app
+          codesign -dvvv Keryx.app 2>&1
+
+      - name: Notarize and staple
+        if: steps.signing.outputs.enabled == 'true'
+        env:
+          AC_KEY_ID: ${{ secrets.AC_KEY_ID }}
+          AC_ISSUER_ID: ${{ secrets.AC_ISSUER_ID }}
+          AC_KEY_P8: ${{ secrets.AC_KEY_P8 }}
+        run: |
+          set -euo pipefail
+          KEY="$RUNNER_TEMP/AuthKey.p8"
+          printf '%s' "$AC_KEY_P8" | openssl base64 -d -A > "$KEY"
+          NOTARIZE_ZIP="$RUNNER_TEMP/Keryx-notarize.zip"
+          ditto -c -k --keepParent Keryx.app "$NOTARIZE_ZIP"
+
+          xcrun notarytool submit "$NOTARIZE_ZIP" \
+            --key "$KEY" --key-id "$AC_KEY_ID" --issuer "$AC_ISSUER_ID" \
+            --wait --timeout 30m
+
+          xcrun stapler staple -v Keryx.app
+          xcrun stapler validate -v Keryx.app
+          rm -f "$KEY" "$NOTARIZE_ZIP"
+
+      - name: Verify Gatekeeper acceptance
+        if: steps.signing.outputs.enabled == 'true'
+        run: |
+          set -euo pipefail
+          echo "--- spctl ---"
+          spctl -a -t exec -vvv Keryx.app 2>&1 | tee /tmp/spctl.txt
+          grep -q "Notarized Developer ID" /tmp/spctl.txt || {
+            echo "::error title=Gatekeeper rejection::Bundle is not recognised as a notarized Developer ID app."
+            exit 1
+          }
+
+      - name: Ad-hoc sign (no Developer ID certificate configured)
+        if: steps.signing.outputs.enabled != 'true'
+        run: |
+          set -euo pipefail
+          codesign --force --sign - Keryx.app
+          codesign --verify --strict --verbose=2 Keryx.app
+
+      - name: Package release zip
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          set -euo pipefail
+          # ditto preserves symlinks/resource forks where plain zip would not.
+          ditto -c -k --keepParent Keryx.app "Keryx-${VERSION}-macos.zip"
+          shasum -a 256 "Keryx-${VERSION}-macos.zip" | tee "Keryx-${VERSION}-macos.zip.sha256"
 
       - name: Create release
+        # Only a tag push publishes; manual runs stop after the verification.
+        if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ github.ref_name }}
+          VERSION: ${{ steps.version.outputs.value }}
         run: |
-          gh release create "$VERSION" "Keryx-${VERSION}-macos.zip" \
+          gh release create "$VERSION" \
+            "Keryx-${VERSION}-macos.zip" \
+            "Keryx-${VERSION}-macos.zip.sha256" \
             --repo "${{ github.repository }}" \
             --generate-notes \
             --title "Keryx $VERSION"
