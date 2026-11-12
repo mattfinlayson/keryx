@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     container: swift:6.4.0-resolute
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run core test suite (Swift Testing)
         run: swift test
 
@@ -21,7 +21,7 @@ jobs:
     # Foundation, catching Darwin vs corelibs behavior differences.
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Release build (AppKit shell)
         run: swift build -c release
       - name: Run core test suite on Darwin
