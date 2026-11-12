@@ -97,6 +97,11 @@ security find-identity -v -p codesigning   # 1 valid identities found
   distribution zip must be created *after* stapling. Use
   `ditto -c -k --keepParent` rather than `zip -r` — `zip` mangles symlinks and
   resource forks in bundles.
+- **Keep the version out of the asset name.** `Keryx-macos.zip`, not
+  `Keryx-v0.5.6-macos.zip`: the version is the tag, and an unversioned asset
+  makes `releases/latest/download/Keryx-macos.zip` a permanent install URL —
+  a versioned filename goes stale on the next release and forces README edits
+  every time.
 - **Assert Gatekeeper acceptance** instead of trusting the notary status:
   `spctl -a -t exec -vvv Keryx.app` must print `source=Notarized Developer ID`,
   otherwise the job fails.

@@ -86,11 +86,26 @@ the app restarts; only genuinely new (or rewritten) files re-flag unread.
 **About:** "About Keryx" in the menu shows the app's purpose, version, and
 author.
 
-**Option 1 — prebuilt app:** download `Keryx-vX.Y.Z-macos.zip` from
-[Releases](https://github.com/mattfinlayson/keryx/releases), unzip, and run
-`Keryx.app`. The bundle is signed with a Developer ID Application certificate
-and notarized by Apple, so it opens on first launch with no Gatekeeper prompt
-— no `xattr` workaround, no "Open Anyway" trip through System Settings.
+**Option 1 — prebuilt app:** download, unzip, and run `Keryx.app` — always
+the newest release:
+
+```sh
+curl -L -o keryx.zip https://github.com/mattfinlayson/keryx/releases/latest/download/Keryx-macos.zip
+unzip -q keryx.zip
+open Keryx.app
+```
+
+To pin a specific version, swap `latest/download` for `download/vX.Y.Z`:
+
+```sh
+curl -L -o keryx.zip https://github.com/mattfinlayson/keryx/releases/download/v0.5.7/Keryx-macos.zip
+```
+
+The asset name is deliberately unversioned so the `latest` URL never goes
+stale; the version is the tag. The bundle is signed with a Developer ID
+Application certificate and notarized by Apple, so it opens on first launch
+with no Gatekeeper prompt — no `xattr` workaround, no "Open Anyway" trip
+through System Settings.
 
 Releases before `v0.5.6` are ad-hoc signed; those still need
 `xattr -cr /path/to/Keryx.app` (or System Settings → Privacy & Security →
@@ -104,7 +119,7 @@ codesign -dvvv Keryx.app 2>&1 | grep -E 'Authority|TeamIdentifier'
 spctl -a -t exec -vvv Keryx.app   # → source=Notarized Developer ID
 ```
 
-A `Keryx-vX.Y.Z-macos.zip.sha256` is published alongside each release.
+A `Keryx-macos.zip.sha256` is published alongside each release.
 
 **Option 2 — from source:**
 

@@ -188,9 +188,12 @@ jobs:
           VERSION: ${{ steps.version.outputs.value }}
         run: |
           set -euo pipefail
+          echo "Packaging Keryx $VERSION"
+          # The version lives in the tag, never in the asset name, so
+          # releases/latest/download/Keryx-macos.zip stays valid forever.
           # ditto preserves symlinks/resource forks where plain zip would not.
-          ditto -c -k --keepParent Keryx.app "Keryx-${VERSION}-macos.zip"
-          shasum -a 256 "Keryx-${VERSION}-macos.zip" | tee "Keryx-${VERSION}-macos.zip.sha256"
+          ditto -c -k --keepParent Keryx.app "Keryx-macos.zip"
+          shasum -a 256 "Keryx-macos.zip" | tee "Keryx-macos.zip.sha256"
 
       - name: Create release
         # Only a tag push publishes; manual runs stop after the verification.
@@ -200,8 +203,8 @@ jobs:
           VERSION: ${{ steps.version.outputs.value }}
         run: |
           gh release create "$VERSION" \
-            "Keryx-${VERSION}-macos.zip" \
-            "Keryx-${VERSION}-macos.zip.sha256" \
+            "Keryx-macos.zip" \
+            "Keryx-macos.zip.sha256" \
             --repo "${{ github.repository }}" \
             --generate-notes \
             --title "Keryx $VERSION"
