@@ -88,17 +88,23 @@ author.
 
 **Option 1 — prebuilt app:** download `Keryx-vX.Y.Z-macos.zip` from
 [Releases](https://github.com/mattfinlayson/keryx/releases), unzip, and run
-`Keryx.app`. The bundle is ad-hoc signed (not notarized — see
-[issue #1](https://github.com/mattfinlayson/keryx/issues/1)), so on first
-launch Gatekeeper will block it. Either run
+`Keryx.app`. The bundle is signed with a Developer ID Application certificate
+and notarized by Apple, so it opens on first launch with no Gatekeeper prompt
+— no `xattr` workaround, no "Open Anyway" trip through System Settings.
+
+Releases before `v0.5.6` are ad-hoc signed; those still need
+`xattr -cr /path/to/Keryx.app` (or System Settings → Privacy & Security →
+**Open Anyway**) once per downloaded copy.
+
+Verify the download yourself before running it:
 
 ```sh
-xattr -cr /path/to/Keryx.app
+codesign --verify --deep --strict --verbose=2 Keryx.app
+codesign -dvvv Keryx.app 2>&1 | grep -E 'Authority|TeamIdentifier'
+spctl -a -t exec -vvv Keryx.app   # → source=Notarized Developer ID
 ```
 
-or open **System Settings → Privacy & Security**, scroll to the warning, and
-click **Open Anyway** (right-click → Open is no longer sufficient on recent
-macOS). This is a one-time step per downloaded copy.
+A `Keryx-vX.Y.Z-macos.zip.sha256` is published alongside each release.
 
 **Option 2 — from source:**
 
